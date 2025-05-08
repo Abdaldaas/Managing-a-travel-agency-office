@@ -5,12 +5,88 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Passport;
+use App\Models\VisaBooking;
+use App\Models\Visa;
+use App\Models\Booking;
+use App\Models\TicketRequest;
+use App\Models\Flight;
+use App\Models\Haj;
+use App\Models\HajBooking;
+
+use App\Models\PassportRequest;
 use App\Models\User;
-class UserController extends Controller
-{
+
+class UserController extends Controller {
+    public function requestPassport(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'passport_type' => 'required|in:regular,urgent',
+            'first_name' => 'required|string|min:2',
+            'last_name' => 'required|string|min:2',
+            'father_name' => 'required|string',
+            'mother_name' => 'required|string',
+            'place_of_birth' => 'required|string',
+            'national_number' => 'required|string',
+            'gender' => 'required|in:male,female',
+            'identity_front' => 'required|file',
+            'identity_back' => 'required|file',
+            'num_dependents'=>'required|integer|max:2',
+            'has_old_passport' => 'required|boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid data',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $identity_front = $request->file('identity_proof')->store('identity_front');
+        $identity_back =$request->file('identity_back')->store('identity_back');
+        $passport = Passport::create([
+            'user_id' => auth()->id(),
+            'passport_type' => $request->passport_type,
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
+            'father_name' => $request->father_name,
+            'mother_name' => $request->mother_name,
+            'date_of_birth' => $request->date_of_birth,
+            'place_of_birth' => $request->place_of_birth,
+            'national_number' => $request->national_number,
+            'gender' => $request->gender,
+            'identity_front' => $identity_front,
+            'identity_back'=> $identity_back,
+            'has_old_passport' => $request->has_old_passport
+        ]);
+
+        $passportRequest = new PassportRequest();
+        $passportRequest->user_id = auth()->id();
+        $passportRequest->passport_id = $passport->id;
+        $passportRequest->passport_type = $request->passport_type;
+        $passportRequest->status = 'processing';
+        $passportRequest->calculatePrice();
+        $passportRequest->save();
+
+        $booking = Booking::create([
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->name,
+            'type' => 'passport',
+            'status' => 'processing',
+            'price' => $passportRequest->price
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Passport request submitted successfully',
+            'passport' => $passport,
+            'passport_request' => $passportRequest,
+            'booking' => $booking
+        ], 201);
+    }
     public function registeruser(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|min:3|max:50',
             'email' => 'required|email|unique:users,email',
@@ -33,9 +109,6 @@ class UserController extends Controller
                 'status' => false,
                 'message'=> 'This email is already registered'
             ], 400);        }
-
-        
-      
         $user = new User();
         $user->name = $request->name;
         $user->email = $request->email;
@@ -53,88 +126,29 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'password' => 'required'
-        ]);
+            ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'status' => false,
-                'message' => 'Invalid data', 
-                'errors' => $validator->errors()
-            ], 400);
-        }
-
+                'status' => false,'message' => 'Invalid data', 'errors' => $validator->errors()], 400);
+            }
         $user = User::where('email', $request->email)->first();
-
         if (!$user) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Email not registered'
-            ], 404);
-        }
-
+            return response()->json(['status' => false,'message' => 'Email not registered'], 404);
+            }
         if (!Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid password'
-            ], 401);
-        }
-
+            return response()->json(['status' => false,'message' => 'Invalid password'], 401);
+            }
         $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Login successful',
-            'user' => $user,
-            'token' => $token
-        ], 200);
+        return response()->json(['status' => true,'message' => 'Login successful',
+        'user' => $user,'token' => $token], 200);
     }
-
-    public function requestPassport(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'passport_number' => 'required|string|unique:passports,passport_number',
-            'issue_date' => 'required|date|before:today',
-            'expiry_date' => 'required|date|after:issue_date',
-            'place_of_issue' => 'required|string|max:100',
-            'nationality' => 'required|string|max:50',
-            'passport_image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid data',
-                'errors' => $validator->errors()
-            ], 400);
-        }
-
-        $passport = new Passport();
-        $passport->user_id = auth()->id();
-        $passport->passport_number = $request->passport_number;
-        $passport->issue_date = $request->issue_date;
-        $passport->expiry_date = $request->expiry_date;
-        $passport->place_of_issue = $request->place_of_issue;
-        $passport->nationality = $request->nationality;
-        $passport->status = 'pending';
-        $passport->save();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Passport request submitted successfully',
-            'passport' => $passport
-        ], 201);
-    }
-
     public function requestVisa(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'country_id' => 'required|exists:countries,id',
-            'visa_type' => 'required|in:tourist,business,student,work',
-            'start_date' => 'required|date|after:today',
-            'duration' => 'required|integer|min:1',
-            'passport_id' => 'required|exists:passports,id',
-            'supporting_documents' => 'required|array',
-            'supporting_documents.*' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048'
+            'visa_id' => 'required|exists:visa,id',
+            'passport_file' => 'required|file',
+            'photo_file' => 'required|file'
         ]);
 
         if ($validator->fails()) {
@@ -145,57 +159,36 @@ class UserController extends Controller
             ], 400);
         }
 
-        $visa = new Visa();
-        $visa->user_id = auth()->id();
-        $visa->country_id = $request->country_id;
-        $visa->visa_type = $request->visa_type;
-        $visa->start_date = $request->start_date;
-        $visa->duration = $request->duration;
-        $visa->passport_id = $request->passport_id;
-        $visa->status = 'pending';
-        $visa->save();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Visa request submitted successfully',
-            'visa' => $visa
-        ], 201);
-    }
-
-    public function requestHaj(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'passport_id' => 'required|exists:passports,id',
-            'preferred_date' => 'required|date|after:today',
-            'package_type' => 'required|in:economy,standard,premium',
-            'accommodation_type' => 'required|string',
-            'number_of_people' => 'required|integer|min:1',
-            'special_requirements' => 'nullable|string'
-        ]);
-
-        if ($validator->fails()) {
+        $visa = Visa::find($request->visa_id);
+        if (!$visa) {
             return response()->json([
                 'status' => false,
-                'message' => 'Invalid data',
-                'errors' => $validator->errors()
-            ], 400);
+                'message' => 'Visa not found'
+            ], 404);
         }
 
-        $haj = new Haj();
-        $haj->user_id = auth()->id();
-        $haj->passport_id = $request->passport_id;
-        $haj->preferred_date = $request->preferred_date;
-        $haj->package_type = $request->package_type;
-        $haj->accommodation_type = $request->accommodation_type;
-        $haj->number_of_people = $request->number_of_people;
-        $haj->special_requirements = $request->special_requirements;
-        $haj->status = 'pending';
-        $haj->save();
+        $passportPath = $request->file('passport_file')->store('passports');
+        $photoPath = $request->file('photo_file')->store('photos');
+        $booking = Booking::create([
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->name,
+            'type' => 'visa',
+            'status' => 'pending',
+            'price' => $visa->Total_cost
+        ]);
+        $visaBooking = new VisaBooking();
+        $visaBooking->user_id = auth()->id();
+        $visaBooking->user_name = auth()->user()->name;
+        $visaBooking->PhotoFile = $photoPath;
+        $visaBooking->PassportFile = $passportPath;
+        $visaBooking->status = 'pending';
+        $visaBooking->save();
 
         return response()->json([
             'status' => true,
-            'message' => 'Haj request submitted successfully',
-            'haj' => $haj
+            'message' => 'Visa booking request submitted successfully',
+            'booking' => $booking,
+            'visa_booking' => $visaBooking
         ], 201);
     }
 
@@ -203,10 +196,49 @@ class UserController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'flight_id' => 'required|exists:flights,id',
-            'passport_id' => 'required|exists:passports,id',
-            'seat_preference' => 'nullable|in:window,aisle,middle',
-            'meal_preference' => 'nullable|string',
-            'special_assistance' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid data',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+        
+        $flight = Flight::find($request->flight_id);
+        if (!$flight) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Flight not found'
+            ], 404);
+        }
+        $booking = Booking::create([
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->name,
+            'type' => 'ticket',
+            'status' => 'pending',
+            'price' => $flight->price
+        ]);
+        $ticketRequest = new TicketRequest();
+        $ticketRequest->user_id = auth()->id();
+        $ticketRequest->flight_id = $request->flight_id;
+        $ticketRequest->total_price = $flight->price;
+        $ticketRequest->status = 'pending';
+        $ticketRequest->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Ticket request submitted successfully',
+            'ticket_request' => $ticketRequest,
+            'booking' => $booking
+        ], 201);
+    }
+
+    public function requestHaj(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'haj_id' => 'required|exists:haj,id',
         ]);
 
         if ($validator->fails()) {
@@ -217,28 +249,35 @@ class UserController extends Controller
             ], 400);
         }
 
-        $flight = Flight::find($request->flight_id);
-        if ($flight->available_seats < 1) {
+        $haj = Haj::find($request->haj_id);
+        if (!$haj) {
             return response()->json([
                 'status' => false,
-                'message' => 'No available seats on this flight'
-            ], 400);
+                'message' => 'Haj package not found'
+            ], 404);
         }
 
-        $ticketRequest = new TicketRequest();
-        $ticketRequest->user_id = auth()->id();
-        $ticketRequest->flight_id = $request->flight_id;
-        $ticketRequest->passport_id = $request->passport_id;
-        $ticketRequest->seat_preference = $request->seat_preference;
-        $ticketRequest->meal_preference = $request->meal_preference;
-        $ticketRequest->special_assistance = $request->special_assistance;
-        $ticketRequest->status = 'pending';
-        $ticketRequest->save();
+        
+        $booking = Booking::create([
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->name,
+            'type' => 'haj',
+            'status' => 'pending',
+            'price' => $haj->total_price
+        ]);
+
+        $hajBooking = new HajBooking();
+        $hajBooking->user_id = auth()->id();
+        $hajBooking->haj_id = $request->haj_id;
+        $hajBooking->status = 'pending';
+        $hajBooking->save();
 
         return response()->json([
             'status' => true,
-            'message' => 'Ticket request submitted successfully',
-            'ticket_request' => $ticketRequest
+            'message' => 'Haj booking request submitted successfully',
+            'booking' => $booking,
+            'haj_booking' => $hajBooking
         ], 201);
     }
 }
+

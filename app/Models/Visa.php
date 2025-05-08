@@ -11,20 +11,13 @@ class Visa extends Model
     protected $table = 'visa';
 
     protected $fillable = [
-        'user_id',
-        'country_id',
+        'country',
         'visa_type',
-        'Total_cost',
-        'Status',
-        'Admin_id',
-        'PassportFile',
-        'PhotoFile',
-        'rejection_reason_id'
+        'Total_cost'
     ];
 
     protected $casts = [
-        'Total_cost' => 'decimal:2',
-        'Status' => 'string'
+        'Total_cost' => 'decimal:2'
     ];
 
     /**
@@ -43,21 +36,6 @@ class Visa extends Model
         return $this->belongsTo(Country::class);
     }
 
-    /**
-     * Get the admin that processed the visa.
-     */
-    public function admin(): BelongsTo
-    {
-        return $this->belongsTo(Admin::class, 'Admin_id');
-    }
-
-    /**
-     * Get the rejection reason for the visa.
-     */
-    public function rejectionReason(): BelongsTo
-    {
-        return $this->belongsTo(RejectionReason::class);
-    }
 
     /**
      * Get all comments for the visa.

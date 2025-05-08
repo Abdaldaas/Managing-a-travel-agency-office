@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('email', 50);
             $table->string('password', 70);
             $table->string('phone', 50);
-            $table->string('role');
+            $table->enum('role', ['user', 'admin', 'super_admin'])->default('user');
             $table->Integer('age');
             $table->rememberToken();
             $table->timestamps();
@@ -33,6 +33,13 @@ return new class extends Migration
      */
     public function down()
     {
+        Schema::dropIfExists('comments');
+        Schema::dropIfExists('ratings');
+        Schema::dropIfExists('haj');
+        Schema::dropIfExists('ticket_requests');
+        Schema::dropIfExists('visa');
+        Schema::dropIfExists('passports');
+        Schema::dropIfExists('notifications');
         Schema::dropIfExists('users');
     }
 };

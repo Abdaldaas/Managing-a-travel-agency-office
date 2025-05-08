@@ -15,10 +15,10 @@ return new class extends Migration
     {
         Schema::create('ratings', function (Blueprint $table) {
             $table->id();
-            $table->integer('star')->default('0')->nullable();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete;
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete;
-            $table->unique(['product_id','user_id']);
+            $table->integer('star')->default(0);
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->morphs('rateable');
+            $table->unique(['rateable_type', 'rateable_id', 'user_id']);
             $table->timestamps();
         });
     }

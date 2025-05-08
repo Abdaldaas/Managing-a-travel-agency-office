@@ -13,8 +13,6 @@ class TicketRequest extends Model
         'number_of_passengers',
         'total_price',
         'status',
-        'admin_id',
-        'rejection_reason_id'
     ];
 
     protected $casts = [
@@ -44,7 +42,7 @@ class TicketRequest extends Model
      */
     public function admin(): BelongsTo
     {
-        return $this->belongsTo(Admin::class);
+        return $this->belongsTo(User::class, 'admin_id')->where('role', 'admin');
     }
 
     /**

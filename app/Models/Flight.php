@@ -16,16 +16,14 @@ class Flight extends Model
         'departure_time',
         'arrival_time',
         'price',
-        'available_seats',
-        'status'
+        'available_seats'
     ];
 
     protected $casts = [
         'departure_time' => 'datetime',
         'arrival_time' => 'datetime',
         'price' => 'decimal:2',
-        'available_seats' => 'integer',
-        'status' => 'string'
+        'available_seats' => 'integer'
     ];
 
     /**

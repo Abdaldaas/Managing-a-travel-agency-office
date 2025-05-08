@@ -37,41 +37,30 @@ class User extends Authenticatable
         return $this->hasMany(Visa::class);
     }
 
-    /**
-     * Get the ratings given by the user.
-     */
+
     public function ratings(): HasMany
     {
         return $this->hasMany(Rating::class);
     }
 
-    /**
-     * Get the comments written by the user.
-     */
+ 
     public function comments(): HasMany
     {
         return $this->hasMany(Comment::class);
     }
 
-    /**
-     * Get the ticket requests for the user.
-     */
     public function ticketRequests(): HasMany
     {
         return $this->hasMany(TicketRequest::class);
     }
 
-    /**
-     * Get the haj applications for the user.
-     */
-    public function hajApplications(): HasMany
+
+    public function hajRequests()
     {
         return $this->hasMany(Haj::class);
     }
 
-    /**
-     * Get the passports for the user.
-     */
+   
     public function passports(): HasMany
     {
         return $this->hasMany(Passport::class);

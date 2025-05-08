@@ -8,23 +8,22 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Haj extends Model
 {
+    protected $table = 'haj';
     protected $fillable = [
-        'user_id',
         'package_type',
-        'status',
+        'total_price',
         'departure_date',
         'return_date',
-        'total_cost',
-        'payment_status'
+        'takeoff_time',
+        'landing_time'
     ];
 
     protected $casts = [
-        'package_type' => 'string',
-        'status' => 'string',
         'departure_date' => 'date',
         'return_date' => 'date',
-        'total_cost' => 'decimal:2',
-        'payment_status' => 'string'
+        'total_price' => 'decimal:2',
+        'takeoff_time' => 'datetime',
+        'landing_time' => 'datetime'
     ];
 
     /**
