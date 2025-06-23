@@ -1,0 +1,241 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-1234-abcdef123456",
+		"name": "Travel Agency API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "User",
+			"item": [
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{"key": "name", "value": "Test User", "type": "text"},
+								{"key": "email", "value": "test@example.com", "type": "text"},
+								{"key": "password", "value": "password123", "type": "text"},
+								{"key": "phone", "value": "1234567890", "type": "text"},
+								{"key": "age", "value": "30", "type": "text"}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login User",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{"key": "email", "value": "test@example.com", "type": "text"},
+								{"key": "password", "value": "password123", "type": "text"}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Request Passport",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{"key": "passport_type", "value": "regular", "type": "text"},
+								{"key": "first_name", "value": "John", "type": "text"},
+								{"key": "last_name", "value": "Doe", "type": "text"},
+								{"key": "father_name", "value": "Richard", "type": "text"},
+								{"key": "mother_name", "value": "Jane", "type": "text"},
+								{"key": "date_of_birth", "value": "1990-01-15", "type": "text"},
+								{"key": "place_of_birth", "value": "New York", "type": "text"},
+								{"key": "nationality", "value": "American", "type": "text"},
+								{"key": "national_number", "value": "123456789", "type": "text"},
+								{"key": "gender", "value": "male", "type": "text"},
+								{"key": "identity_front", "type": "file", "src": []},
+								{"key": "identity_back", "type": "file", "src": []},
+								{"key": "num_dependents", "value": "1", "type": "text"},
+								{"key": "dependent_details[0][name]", "value": "Baby Doe", "type": "text"},
+								{"key": "dependent_details[0][age]", "value": "2", "type": "text"},
+								{"key": "has_old_passport", "value": "false", "type": "text"}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/passport/request",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"passport",
+								"request"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Bookings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/bookings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"bookings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Booking",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/bookings/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"bookings",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Requests Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/requests/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"requests",
+								"status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000"
+		},
+		{
+			"key": "auth_token",
+			"value": ""
+		}
+	]
+}

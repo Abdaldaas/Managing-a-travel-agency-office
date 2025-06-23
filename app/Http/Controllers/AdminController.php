@@ -397,6 +397,77 @@ public function updateVisaBooking(Request $request)
         }
     }
 
+    public function handlePassportRequest(Request $request)
+    {
+        if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+            return response()->json([
+                'status' => false,
+                'message' => 'You are not authorized to perform this action'
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'request_id' => 'required|exists:passport_requests,id',
+            'status' => 'required|in:pending_payment,completed,rejected',
+            'rejection_reason' => 'required_if:status,rejected|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid data',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $passportRequest = PassportRequest::find($request->request_id);
+        if (!$passportRequest) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Passport request not found'
+            ], 404);
+        }
+
+        if ($passportRequest->status !== 'processing') {
+            return response()->json([
+                'status' => false,
+                'message' => 'This passport request has already been processed'
+            ], 400);
+        }
+
+        $passportRequest->status = $request->status;
+        $passportRequest->save();
+
+        if ($request->status === 'rejected' && $request->rejection_reason) {
+            $rejectionReason = new RejectionReason([
+                'reason' => $request->rejection_reason,
+                'request_type' => 'passport',
+                'request_id' => $passportRequest->id
+            ]);
+            $rejectionReason->save();
+        }
+
+        // Create notification for the user
+        // $title = 'Passport Request ' . ucfirst($request->status);
+        // $message = 'Your passport request has been ' . $request->status . '.';
+        // if ($request->status === 'rejected') {
+        //     $message .= ' Reason: ' . $request->rejection_reason;
+        // }
+
+        // Notification::create([
+        //     'user_id' => $passportRequest->user_id,
+        //     'title' => $title,
+        //     'message' => $message,
+        //     'type' => 'passport_request'
+        // ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Passport request ' . $request->status . ' successfully',
+            'passport_request' => $passportRequest
+        ]);
+    }
+
     public function updateBookingStatus(Request $request, $id)
     {
         try {

@@ -27,6 +27,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/{id}/read', [UserController::class, 'markNotificationAsRead']);
     Route::delete('/notifications/{id}', [UserController::class, 'deleteNotification']);
     Route::get('/requests/status', [UserController::class, 'getRequestsStatus']);
+    Route::post('/logout', [UserController::class, 'logout']);
+    Route::get('/bookings', [UserController::class, 'getBookings']);
+    Route::delete('/bookings/{id}', [UserController::class, 'cancelBooking']);
    
 });
 

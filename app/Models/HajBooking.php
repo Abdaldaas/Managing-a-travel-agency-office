@@ -11,7 +11,10 @@ class HajBooking extends Model
         'user_id',
         'haj_id',
         'status',
-        'rejection_reason'
+        'passport_file',
+        'photo_file',
+        'health_report_file',
+        'vaccination_certificate'
     ];
 
     protected $casts = [

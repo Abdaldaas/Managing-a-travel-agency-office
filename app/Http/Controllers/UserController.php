@@ -26,13 +26,16 @@ class UserController extends Controller {
             'last_name' => 'required|string|min:2',
             'father_name' => 'required|string',
             'mother_name' => 'required|string',
+            'date_of_birth' => 'required|date',
             'place_of_birth' => 'required|string',
+            'nationality' => 'required|string',
             'national_number' => 'required|string',
             'gender' => 'required|in:male,female',
             'identity_front' => 'required|file',
             'identity_back' => 'required|file',
             'num_dependents'=>'required|integer|max:2',
-            'has_old_passport' => 'required|boolean'
+            'dependent_details' => 'nullable|array',
+            'has_old_passport' => 'required|in:true,false,0,1'
         ]);
 
         if ($validator->fails()) {
@@ -43,10 +46,15 @@ class UserController extends Controller {
             ], 400);
         }
 
-        $identity_front = $request->file('identity_proof')->store('identity_front');
+        $identity_front = $request->file('identity_front')->store('identity_front');
         $identity_back =$request->file('identity_back')->store('identity_back');
+        do {
+            $passport_number = 'P' . mt_rand(10000000, 99999999);
+        } while (Passport::where('passport_number', $passport_number)->exists());
+
         $passport = Passport::create([
             'user_id' => auth()->id(),
+            'passport_number' => $passport_number,
             'passport_type' => $request->passport_type,
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
@@ -54,11 +62,14 @@ class UserController extends Controller {
             'mother_name' => $request->mother_name,
             'date_of_birth' => $request->date_of_birth,
             'place_of_birth' => $request->place_of_birth,
+            'nationality' => $request->nationality,
             'national_number' => $request->national_number,
             'gender' => $request->gender,
             'identity_front' => $identity_front,
             'identity_back'=> $identity_back,
-            'has_old_passport' => $request->has_old_passport
+            'num_dependents' => $request->num_dependents,
+            'dependent_details' => $request->dependent_details,
+            'has_old_passport' => filter_var($request->has_old_passport, FILTER_VALIDATE_BOOLEAN)
         ]);
 
         $passportRequest = new PassportRequest();
@@ -239,6 +250,10 @@ class UserController extends Controller {
     {
         $validator = Validator::make($request->all(), [
             'haj_id' => 'required|exists:haj,id',
+            'passport_file' => 'required|file',
+            'photo_file' => 'required|file',
+            'health_report_file' => 'required|file',
+            'vaccination_certificate' => 'required|file'
         ]);
 
         if ($validator->fails()) {
@@ -266,10 +281,19 @@ class UserController extends Controller {
             'price' => $haj->total_price
         ]);
 
+        $passportPath = $request->file('passport_file')->store('passports');
+        $photoPath = $request->file('photo_file')->store('photos');
+        $healthReportPath = $request->file('health_report_file')->store('health_reports');
+        $vaccinationPath = $request->file('vaccination_certificate')->store('vaccination_certificates');
+
         $hajBooking = new HajBooking();
         $hajBooking->user_id = auth()->id();
         $hajBooking->haj_id = $request->haj_id;
         $hajBooking->status = 'pending';
+        $hajBooking->passport_file = $passportPath;
+        $hajBooking->photo_file = $photoPath;
+        $hajBooking->health_report_file = $healthReportPath;
+        $hajBooking->vaccination_certificate = $vaccinationPath;
         $hajBooking->save();
 
         return response()->json([
@@ -278,6 +302,55 @@ class UserController extends Controller {
             'booking' => $booking,
             'haj_booking' => $hajBooking
         ], 201);
+    }
+
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+        return response()->json(['status' => true, 'message' => 'Logged out successfully'], 200);
+    }
+
+    public function getBookings(Request $request)
+    {
+        $bookings = Booking::where('user_id', auth()->id())->get();
+        return response()->json(['status' => true, 'bookings' => $bookings], 200);
+    }
+
+    public function cancelBooking(Request $request, $id)
+    {
+        $booking = Booking::find($id);
+
+        if (!$booking) {
+            return response()->json(['status' => false, 'message' => 'Booking not found'], 404);
+        }
+
+        if ($booking->user_id !== auth()->id()) {
+            return response()->json(['status' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $booking->delete();
+
+        return response()->json(['status' => true, 'message' => 'Booking canceled successfully'], 200);
+    }
+
+    public function getRequestsStatus(Request $request)
+    {
+        $userId = auth()->id();
+
+        $passportRequests = PassportRequest::where('user_id', $userId)->get();
+        $visaBookings = VisaBooking::where('user_id', $userId)->get();
+        $ticketRequests = TicketRequest::where('user_id', $userId)->get();
+        $hajBookings = HajBooking::where('user_id', $userId)->get();
+
+        return response()->json([
+            'status' => true,
+            'requests' => [
+                'passport_requests' => $passportRequests,
+                'visa_bookings' => $visaBookings,
+                'ticket_requests' => $ticketRequests,
+                'haj_bookings' => $hajBookings,
+            ]
+        ], 200);
     }
 }
 

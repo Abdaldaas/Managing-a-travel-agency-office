@@ -120,8 +120,8 @@ class HajController extends Controller
 
         // Check if there are any bookings related to this haj trip
         $hasBookings = Booking::where('type', 'haj')
-            ->where('bookable_type', Haj::class)
-            ->where('bookable_id', $id)
+            ->where('type', Haj::class)
+            ->where('id', $id)
             ->exists();
 
         if ($hasBookings) {
