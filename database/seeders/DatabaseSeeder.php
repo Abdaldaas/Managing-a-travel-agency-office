@@ -87,10 +87,10 @@ class DatabaseSeeder extends Seeder
 
         // Create rejection reasons
         $reasons = [
-            ['reason' => 'Incomplete documentation'],
-            ['reason' => 'Invalid passport'],
-            ['reason' => 'Missing visa requirements'],
-            ['reason' => 'Payment issues']
+            ['reason' => 'Incomplete documentation', 'request_type' => 'visa', 'request_id' => 1, 'user_id' => 1],
+            ['reason' => 'Invalid passport', 'request_type' => 'passport', 'request_id' => 1, 'user_id' => 1],
+            ['reason' => 'Missing visa requirements', 'request_type' => 'visa', 'request_id' => 2, 'user_id' => 1],
+            ['reason' => 'Payment issues', 'request_type' => 'haj', 'request_id' => 1, 'user_id' => 1]
         ];
 
         foreach ($reasons as $reason) {

@@ -166,9 +166,7 @@ public function handleTicketRequest(Request $request)
 
     // Update the corresponding booking status
     $booking = Booking::where('user_id', $ticketRequest->user_id)
-        ->where('type', 'ticket')
-        ->where('status', 'pending')
-        ->first();
+        ->where('type', 'ticket')->where('status', 'pending')->first();
 
     if ($booking) {
         $booking->status = $request->status;
@@ -179,7 +177,8 @@ public function handleTicketRequest(Request $request)
         $rejectionReason = new RejectionReason([
             'reason' => $request->rejection_reason,
             'request_type' => 'ticket',
-            'request_id' => $ticketRequest->id
+            'request_id' => $ticketRequest->id,
+            'user_id' => $ticketRequest->user_id
         ]);
         $rejectionReason->save();
 
@@ -222,18 +221,24 @@ public function updateVisaBooking(Request $request)
         ], 400);
     }
 
-    $visaBooking = \App\Models\VisaBooking::find($request->visa_booking_id);
+    $visaBooking = VisaBooking::find($request->visa_booking_id);
     if (!$visaBooking) {
         return response()->json([
             'status' => false,
             'message' => 'Visa booking not found'
         ], 404);
     }
-
+    if ($visaBooking->status !== 'processing') {
+        return response()->json([
+            'status' => false,
+            'message' => 'This passport request has already been processed'
+        ], 400);
+    }
     $visaBooking->status = $request->status;
     if ($request->status === 'rejected' && $request->rejection_reason) {
         $visaBooking->rejection_reason = $request->rejection_reason;
     }
+
     $visaBooking->save();
 
     return response()->json([
@@ -300,7 +305,8 @@ public function updateVisaBooking(Request $request)
             $rejectionReason = new RejectionReason([
                 'reason' => $request->rejection_reason,
                 'request_type' => 'haj',
-                'request_id' => $hajBooking->id
+                'request_id' => $hajBooking->id,
+                'user_id' => $hajBooking->user_id
             ]);
             $rejectionReason->save();
 
@@ -442,7 +448,8 @@ public function updateVisaBooking(Request $request)
             $rejectionReason = new RejectionReason([
                 'reason' => $request->rejection_reason,
                 'request_type' => 'passport',
-                'request_id' => $passportRequest->id
+                'request_id' => $passportRequest->id,
+                'user_id' => $passportRequest->user_id
             ]);
             $rejectionReason->save();
         }
@@ -489,7 +496,10 @@ public function updateVisaBooking(Request $request)
             
             if ($request->status === 'rejected' && $request->has('rejection_reason')) {
                 $rejectionReason = new RejectionReason([
-                    'reason' => $request->rejection_reason
+                    'reason' => $request->rejection_reason,
+                    'request_type' => $booking->type,
+                    'request_id' => $booking->id,
+                    'user_id' => $booking->user_id
                 ]);
                 $booking->rejectionReason()->save($rejectionReason);
             }

@@ -7,8 +7,10 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\FlightController;
 use App\Http\Controllers\HajController;
 use App\Http\Controllers\VisaController;
+use App\Http\Controllers\WeatherController;
 
 // Public routes
+Route::get('/weather', [WeatherController::class, 'getWeather']);
 Route::post('/register', [UserController::class, 'registeruser']);
 Route::post('/login', [UserController::class, 'login']);
 

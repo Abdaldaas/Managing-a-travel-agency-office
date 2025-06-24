@@ -9,30 +9,16 @@ class RejectionReason extends Model
 {
     protected $fillable = [
         'reason',
-        'description'
+        'request_type',
+        'request_id',
+        'user_id'
     ];
 
     /**
-     * Get the visa applications that use this rejection reason.
+     * Get the user who owns this rejection reason.
      */
-    public function visas(): HasMany
+    public function user()
     {
-        return $this->hasMany(Visa::class);
-    }
-
-    /**
-     * Get the ticket requests that use this rejection reason.
-     */
-    public function ticketRequests(): HasMany
-    {
-        return $this->hasMany(TicketRequest::class);
-    }
-
-    /**
-     * Get the haj applications that use this rejection reason.
-     */
-    public function hajApplications(): HasMany
-    {
-        return $this->hasMany(Haj::class);
+        return $this->belongsTo(User::class);
     }
 }
