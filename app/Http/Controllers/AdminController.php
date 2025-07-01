@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
+use App\Events\PassportStatusUpdated;
+use App\Events\VisaStatusUpdated;
+use App\Events\TicketStatusUpdated;
+
 class AdminController extends Controller {
     public function adminLogin(Request $request)
     {
@@ -153,16 +157,18 @@ public function handleTicketRequest(Request $request)
             'message' => 'Ticket request not found'
         ], 404);
     }
-
     if ($ticketRequest->status !== 'pending') {
         return response()->json([
             'status' => false,
             'message' => 'This ticket request has already been processed'
         ], 400);
     }
-
+    $oldStatus = $ticketRequest->status;
     $ticketRequest->status = $request->status;
     $ticketRequest->save();
+
+    // Dispatch the event
+    event(new TicketStatusUpdated($ticketRequest, $oldStatus, $request->status));
 
     // Update the corresponding booking status
     $booking = Booking::where('user_id', $ticketRequest->user_id)
@@ -183,13 +189,13 @@ public function handleTicketRequest(Request $request)
         $rejectionReason->save();
 
         // Create notification for rejection
-     Notification::create([
-            'user_id' => $ticketRequest->user_id,
-            'title' => 'Ticket Request Rejected',
-            'message' => 'Your ticket request has been rejected. Reason: ' . $request->rejection_reason,
-            'type' => 'ticket_request'
-        ]);
-    } 
+        // Notification::create([
+        //     'user_id' => $ticketRequest->user_id,
+        //     'title' => 'Ticket Request Rejected',
+        //     'message' => 'Your ticket request has been rejected. Reason: ' . $request->rejection_reason,
+        //     'type' => 'ticket_request'
+        // ]);
+    }
 
     return response()->json([
         'status' => true,
@@ -228,12 +234,15 @@ public function updateVisaBooking(Request $request)
             'message' => 'Visa booking not found'
         ], 404);
     }
-    if ($visaBooking->status !== 'processing') {
+
+    if ($visaBooking->status !== 'pending') {
         return response()->json([
             'status' => false,
-            'message' => 'This passport request has already been processed'
+            'message' => 'This Visa request has already been processed'
         ], 400);
     }
+
+    $oldStatus = $visaBooking->status;
     $visaBooking->status = $request->status;
     if ($request->status === 'rejected' && $request->rejection_reason) {
         $visaBooking->rejection_reason = $request->rejection_reason;
@@ -241,282 +250,340 @@ public function updateVisaBooking(Request $request)
 
     $visaBooking->save();
 
+    // Dispatch the event
+    event(new VisaStatusUpdated($visaBooking, $oldStatus, $request->status));
+
     return response()->json([
         'status' => true,
         'message' => 'Visa booking status updated successfully',
         'visa_booking' => $visaBooking
     ]);
-}        
+}
 
-    public function handleHajBookingRequest(Request $request)
-    {
-        if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
-            return response()->json([
-                'status' => false,
-                'message' => 'You are not authorized to perform this action'
-            ], 403);
-        }
+public function handleHajBookingRequest(Request $request)
+{
+    if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        return response()->json([
+            'status' => false,
+            'message' => 'You are not authorized to perform this action'
+        ], 403);
+    }
 
+    $validator = Validator::make($request->all(), [
+        'haj_booking_id' => 'required|exists:haj_bookings,id',
+        'status' => 'required|in:approved,rejected',
+        'rejection_reason' => 'required_if:status,rejected|string'
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Invalid data',
+            'errors' => $validator->errors()
+        ], 400);
+    }
+
+    $hajBooking = HajBooking::find($request->haj_booking_id);
+    if (!$hajBooking) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Haj booking request not found'
+        ], 404);
+    }
+
+    if ($hajBooking->status !== 'pending') {
+        return response()->json([
+            'status' => false,
+            'message' => 'This haj booking request has already been processed'
+        ], 400);
+    }
+
+    $hajBooking->status = $request->status;
+    $hajBooking->admin_id = auth()->id();
+    $hajBooking->save();
+
+    // Update the corresponding booking status
+    $booking = Booking::where('user_id', $hajBooking->user_id)
+        ->where('type', 'haj')
+        ->where('status', 'pending')
+        ->first();
+
+    if ($booking) {
+        $booking->status = $request->status;
+        $booking->save();
+    }
+
+    if ($request->status === 'rejected' && $request->rejection_reason) {
+        $rejectionReason = new RejectionReason([
+            'reason' => $request->rejection_reason,
+            'request_type' => 'haj',
+            'request_id' => $hajBooking->id,
+            'user_id' => $hajBooking->user_id
+        ]);
+        $rejectionReason->save();
+    }
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Haj booking request processed successfully',
+        'haj_booking' => $hajBooking
+    ]);
+}
+
+public function getBookingDetails($id)
+{
+    $booking = Booking::where('id', $id)->first();
+    if (!$booking) {
+        return response()->json([
+            'status' => false,
+            'message' => 'booking not found'
+        ], 404);
+    }
+
+    return response()->json([
+        'status' => true,
+        'message' => 'booking retrieved successfully',
+        'visa' => $booking
+    ]);
+}
+
+public function getAllVisaBookings()
+{
+    try {
+        $visaBookings = VisaBooking::get();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'All visa bookings retrieved successfully',
+            'data' => $visaBookings
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error occurred while retrieving visa bookings'
+        ], 500);
+    }
+}
+
+public function getAllHajBookings()
+{
+    try {
+        $hajBookings = HajBooking::get();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'All Hajj bookings retrieved successfully',
+            'data' => $hajBookings
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error occurred while retrieving Hajj bookings'
+        ], 500);
+    }
+}
+
+public function getAllTicketRequests()
+{
+    try {
+        $ticketRequests = TicketRequest::get();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'All ticket requests retrieved successfully',
+            'data' => $ticketRequests
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error occurred while retrieving ticket requests'
+        ], 500);
+    }
+}
+
+public function getAllPassportRequests()
+{
+    try {
+        $passportRequests = PassportRequest::get();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'All passport requests retrieved successfully',
+            'data' => $passportRequests
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error occurred while retrieving passport requests'
+        ], 500);
+    }
+}
+
+public function handlePassportRequest(Request $request)
+{
+    if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        return response()->json([
+            'status' => false,
+            'message' => 'You are not authorized to perform this action'
+        ], 403);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'passport_request_id' => 'required|exists:passport_requests,id',
+        'status' => 'required|in:approved,rejected',
+        'rejection_reason' => 'required_if:status,rejected|string'
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Invalid data',
+            'errors' => $validator->errors()
+        ], 400);
+    }
+
+    $passportRequest = PassportRequest::find($request->passport_request_id);
+    if (!$passportRequest) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Passport request not found'
+        ], 404);
+    }
+
+    $oldStatus = $passportRequest->status;
+    $passportRequest->status = $request->status;
+    $passportRequest->save();
+
+    // Dispatch the event
+    event(new PassportStatusUpdated($passportRequest, $oldStatus, $request->status));
+
+    if ($request->status === 'rejected' && $request->rejection_reason) {
+        $rejectionReason = new RejectionReason([
+            'reason' => $request->rejection_reason,
+            'request_type' => 'passport',
+            'request_id' => $passportRequest->id,
+            'user_id' => $passportRequest->user_id
+        ]);
+        $rejectionReason->save();
+    }
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Passport request ' . $request->status . ' successfully',
+        'passport_request' => $passportRequest
+    ]);
+}
+
+public function updateBookingStatus(Request $request, $id)
+{
+    try {
         $validator = Validator::make($request->all(), [
-            'haj_booking_id' => 'required|exists:haj_bookings,id',
-            'status' => 'required|in:approved,rejected',
-            'rejection_reason' => 'required_if:status,rejected|string'
+            'status' => 'required|in:pending,approved,rejected',
+            'rejection_reason' => 'required_if:status,rejected'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'status' => false,
+                'status' => 'error',
                 'message' => 'Invalid data',
                 'errors' => $validator->errors()
-            ], 400);
+            ], 422);
         }
 
-        $hajBooking = HajBooking::find($request->haj_booking_id);
-        if (!$hajBooking) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Haj booking request not found'
-            ], 404);
-        }
-
-        if ($hajBooking->status !== 'pending') {
-            return response()->json([
-                'status' => false,
-                'message' => 'This haj booking request has already been processed'
-            ], 400);
-        }
-
-        $hajBooking->status = $request->status;
-        $hajBooking->admin_id = auth()->id();
-        $hajBooking->save();
-
-        // Update the corresponding booking status
-        $booking = Booking::where('user_id', $hajBooking->user_id)
-            ->where('type', 'haj')
-            ->where('status', 'pending')
-            ->first();
-
-        if ($booking) {
-            $booking->status = $request->status;
-            $booking->save();
-        }
-
-        if ($request->status === 'rejected' && $request->rejection_reason) {
+        $booking = Booking::findOrFail($id);
+        $booking->status = $request->status;
+        
+        if ($request->status === 'rejected' && $request->has('rejection_reason')) {
             $rejectionReason = new RejectionReason([
                 'reason' => $request->rejection_reason,
-                'request_type' => 'haj',
-                'request_id' => $hajBooking->id,
-                'user_id' => $hajBooking->user_id
+                'request_type' => $booking->type,
+                'request_id' => $booking->id,
+                'user_id' => $booking->user_id
             ]);
-            $rejectionReason->save();
+            $booking->rejectionReason()->save($rejectionReason);
+        }
+        
+        $booking->save();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Booking status updated successfully',
+            'data' => $booking
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error occurred while updating booking status'
+        ], 500);
+    }
+}
 
-            
-        } 
-
+public function getNotifications()
+{
+    try {
+        $admin = auth()->user();
+        
         return response()->json([
             'status' => true,
-            'message' => 'Haj booking request processed successfully',
-            'haj_booking' => $hajBooking
+            'data' => [
+                'unread' => $admin->unreadNotifications,
+                'read' => $admin->readNotifications
+            ]
         ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Error fetching notifications: ' . $e->getMessage()
+        ], 500);
     }
-    public function getBookingDetails($id)
-    {
-        $booking = Booking::where('id', $id)->first();
-        if (!$booking) {
+}
+
+public function markNotificationAsRead($id)
+{
+    try {
+        $admin = auth()->user();
+        $notification = $admin->unreadNotifications->where('id', $id)->first();
+
+        if (!$notification) {
             return response()->json([
                 'status' => false,
-                'message' => 'booking not found'
+                'message' => 'Notification not found'
             ], 404);
         }
 
+        $notification->markAsRead();
+
         return response()->json([
             'status' => true,
-            'message' => 'booking retrieved successfully',
-            'visa' => $booking
+            'message' => 'Notification marked as read'
         ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Error marking notification as read: ' . $e->getMessage()
+        ], 500);
     }
-    public function getAllVisaBookings()
-    {
-        try {
-            $visaBookings = VisaBooking::get();
-            return response()->json([
-                'status' => 'success',
-                'message' => 'All visa bookings retrieved successfully',
-                'data' => $visaBookings
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error occurred while retrieving visa bookings'
-            ], 500);
-        }
-    }
+}
 
-    public function getAllHajBookings()
-    {
-        try {
-            $hajBookings = HajBooking::get();
-            return response()->json([
-                'status' => 'success',
-                'message' => 'All Hajj bookings retrieved successfully',
-                'data' => $hajBookings
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error occurred while retrieving Hajj bookings'
-            ], 500);
-        }
-    }
+public function deleteNotification($id)
+{
+    try {
+        $admin = auth()->user();
+        $notification = $admin->notifications->where('id', $id)->first();
 
-    public function getAllTicketRequests()
-    {
-        try {
-            $ticketRequests = TicketRequest::get();
-            return response()->json([
-                'status' => 'success',
-                'message' => 'All ticket requests retrieved successfully',
-                'data' => $ticketRequests
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error occurred while retrieving ticket requests'
-            ], 500);
-        }
-    }
-
-    public function getAllPassportRequests()
-    {
-        try {
-            $passportRequests = PassportRequest::get();
-            return response()->json([
-                'status' => 'success',
-                'message' => 'All passport requests retrieved successfully',
-                'data' => $passportRequests
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error occurred while retrieving passport requests'
-            ], 500);
-        }
-    }
-
-    public function handlePassportRequest(Request $request)
-    {
-        if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        if (!$notification) {
             return response()->json([
                 'status' => false,
-                'message' => 'You are not authorized to perform this action'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'request_id' => 'required|exists:passport_requests,id',
-            'status' => 'required|in:pending_payment,completed,rejected',
-            'rejection_reason' => 'required_if:status,rejected|string'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid data',
-                'errors' => $validator->errors()
-            ], 400);
-        }
-
-        $passportRequest = PassportRequest::find($request->request_id);
-        if (!$passportRequest) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Passport request not found'
+                'message' => 'Notification not found'
             ], 404);
         }
 
-        if ($passportRequest->status !== 'processing') {
-            return response()->json([
-                'status' => false,
-                'message' => 'This passport request has already been processed'
-            ], 400);
-        }
-
-        $passportRequest->status = $request->status;
-        $passportRequest->save();
-
-        if ($request->status === 'rejected' && $request->rejection_reason) {
-            $rejectionReason = new RejectionReason([
-                'reason' => $request->rejection_reason,
-                'request_type' => 'passport',
-                'request_id' => $passportRequest->id,
-                'user_id' => $passportRequest->user_id
-            ]);
-            $rejectionReason->save();
-        }
-
-        // Create notification for the user
-        // $title = 'Passport Request ' . ucfirst($request->status);
-        // $message = 'Your passport request has been ' . $request->status . '.';
-        // if ($request->status === 'rejected') {
-        //     $message .= ' Reason: ' . $request->rejection_reason;
-        // }
-
-        // Notification::create([
-        //     'user_id' => $passportRequest->user_id,
-        //     'title' => $title,
-        //     'message' => $message,
-        //     'type' => 'passport_request'
-        // ]);
+        $notification->delete();
 
         return response()->json([
             'status' => true,
-            'message' => 'Passport request ' . $request->status . ' successfully',
-            'passport_request' => $passportRequest
+            'message' => 'Notification deleted'
         ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Error deleting notification: ' . $e->getMessage()
+        ], 500);
     }
-
-    public function updateBookingStatus(Request $request, $id)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'status' => 'required|in:pending,approved,rejected',
-                'rejection_reason' => 'required_if:status,rejected'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Invalid data',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $booking = Booking::findOrFail($id);
-            $booking->status = $request->status;
-            
-            if ($request->status === 'rejected' && $request->has('rejection_reason')) {
-                $rejectionReason = new RejectionReason([
-                    'reason' => $request->rejection_reason,
-                    'request_type' => $booking->type,
-                    'request_id' => $booking->id,
-                    'user_id' => $booking->user_id
-                ]);
-                $booking->rejectionReason()->save($rejectionReason);
-            }
-            
-            $booking->save();
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Booking status updated successfully',
-                'data' => $booking
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error occurred while updating booking status'
-            ], 500);
-        }
-    }
-
-
+}
 }

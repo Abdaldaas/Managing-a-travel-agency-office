@@ -21,7 +21,7 @@ class WeatherController extends Controller
         $apiUrl = "http://api.weatherapi.com/v1/current.json?key={$apiKey}&q={$city}";
 
         try {
-            $response = Http::get($apiUrl);
+            $response = Http::timeout(30)->get($apiUrl);
             $data = $response->json();
 
             if ($response->successful()) {
