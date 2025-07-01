@@ -17,6 +17,11 @@ use App\Models\HajBooking;
 use App\Models\PassportRequest;
 use App\Models\User;
 
+use App\Events\PassportRequested;
+use App\Events\VisaRequested;
+use App\Events\TicketRequested;
+use Illuminate\Notifications\DatabaseNotification;
+
 class UserController extends Controller {
     public function requestPassport(Request $request)
     {
@@ -79,6 +84,9 @@ class UserController extends Controller {
         $passportRequest->status = 'processing';
         $passportRequest->calculatePrice();
         $passportRequest->save();
+
+        // Dispatch the event
+        event(new PassportRequested($passportRequest));
 
         $booking = Booking::create([
             'user_id' => auth()->id(),
@@ -195,6 +203,9 @@ class UserController extends Controller {
         $visaBooking->status = 'pending';
         $visaBooking->save();
 
+        // Dispatch the event
+        event(new VisaRequested($visaBooking));
+
         return response()->json([
             'status' => true,
             'message' => 'Visa booking request submitted successfully',
@@ -237,6 +248,9 @@ class UserController extends Controller {
         $ticketRequest->total_price = $flight->price;
         $ticketRequest->status = 'pending';
         $ticketRequest->save();
+
+        // Dispatch the event
+        event(new TicketRequested($ticketRequest));
 
         return response()->json([
             'status' => true,
@@ -351,6 +365,80 @@ class UserController extends Controller {
                 'haj_bookings' => $hajBookings,
             ]
         ], 200);
+    }
+
+    public function getNotifications()
+    {
+        try {
+            $user = auth()->user();
+            
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'unread' => $user->unreadNotifications,
+                    'read' => $user->readNotifications
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error fetching notifications: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function markNotificationAsRead($id)
+    {
+        try {
+            $user = auth()->user();
+            $notification = $user->unreadNotifications->where('id', $id)->first();
+
+            if (!$notification) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Notification not found'
+                ], 404);
+            }
+
+            $notification->markAsRead();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Notification marked as read'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error marking notification as read: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteNotification($id)
+    {
+        try {
+            $user = auth()->user();
+            $notification = $user->notifications->where('id', $id)->first();
+
+            if (!$notification) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Notification not found'
+                ], 404);
+            }
+
+            $notification->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Notification deleted'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error deleting notification: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
 

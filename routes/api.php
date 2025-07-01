@@ -8,6 +8,7 @@ use App\Http\Controllers\FlightController;
 use App\Http\Controllers\HajController;
 use App\Http\Controllers\VisaController;
 use App\Http\Controllers\WeatherController;
+use App\Http\Controllers\TaxiController;
 
 // Public routes
 Route::get('/weather', [WeatherController::class, 'getWeather']);
@@ -26,13 +27,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/haj/request', [UserController::class, 'requestHaj']);
     // الإشعارات
     Route::get('/notifications', [UserController::class, 'getNotifications']);
-    Route::put('/notifications/{id}/read', [UserController::class, 'markNotificationAsRead']);
+    Route::patch('/notifications/{id}/mark-as-read', [UserController::class, 'markNotificationAsRead']);
     Route::delete('/notifications/{id}', [UserController::class, 'deleteNotification']);
     Route::get('/requests/status', [UserController::class, 'getRequestsStatus']);
     Route::post('/logout', [UserController::class, 'logout']);
     Route::get('/bookings', [UserController::class, 'getBookings']);
     Route::delete('/bookings/{id}', [UserController::class, 'cancelBooking']);
    
+    // Taxi routes
+    Route::post('/taxi/request', [TaxiController::class, 'requestTaxi']);
+    Route::get('/taxi/requests', [TaxiController::class, 'getUserRequests']);
+    Route::delete('/taxi/requests/{id}', [TaxiController::class, 'cancelRequest']);
 });
 
 // Admin login
@@ -86,6 +91,22 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/flight/{id}', [FlightController::class, 'deleteFlight']);
     Route::get('/admin/flight', [FlightController::class, 'getAllFlights']);
     Route::get('/admin/flight/{id}', [FlightController::class, 'getFlightById']);
+    // Notification management
+    Route::get('/admin/notifications', [AdminController::class, 'getNotifications']);
+    Route::patch('/admin/notifications/{id}/mark-as-read', [AdminController::class, 'markNotificationAsRead']);
+    Route::delete('/admin/notifications/{id}', [AdminController::class, 'deleteNotification']);
+});
+
+// Taxi routes
+Route::middleware('auth:sanctum')->group(function () {
+    // Driver routes
+    Route::middleware('taxi.driver')->group(function () {
+        Route::post('/taxi/location', [TaxiController::class, 'updateLocation']);
+        Route::post('/taxi/requests/{id}/accept', [TaxiController::class, 'acceptRequest']);
+        Route::post('/taxi/requests/{id}/start', [TaxiController::class, 'startTrip']);
+        Route::post('/taxi/requests/{id}/complete', [TaxiController::class, 'completeTrip']);
+        Route::get('/taxi/active-request', [TaxiController::class, 'getActiveRequest']);
+    });
 });
 
 
