@@ -47,6 +47,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Visa::class);
     }
+    public function visasrequests(): HasMany
+    {
+        return $this->hasMany(VisaBooking::class);
+    }
 
     public function ratings(): HasMany
     {
@@ -65,14 +69,17 @@ class User extends Authenticatable
 
     public function hajRequests()
     {
-        return $this->hasMany(Haj::class);
+        return $this->hasMany(HajBooking::class);
     }
 
     public function passports(): HasMany
     {
         return $this->hasMany(Passport::class);
     }
-
+    public function passportrequests(): HasMany
+    {
+        return $this->hasMany(PassportRequest::class);
+    }
     /**
      * Get the taxi driver profile associated with the user.
      */
