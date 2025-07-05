@@ -224,7 +224,7 @@ public function updateVisaBooking(Request $request)
             'status' => false,
             'message' => 'Invalid data',
             'errors' => $validator->errors()
-        ], 400);
+           ], 400);
     }
 
     $visaBooking = VisaBooking::find($request->visa_booking_id);
@@ -238,27 +238,41 @@ public function updateVisaBooking(Request $request)
     if ($visaBooking->status !== 'pending') {
         return response()->json([
             'status' => false,
-            'message' => 'This Visa request has already been processed'
+            'message' => 'This Visa request has already been processed' ,
+            'ticket_request' => $visaBooking->status
         ], 400);
     }
 
     $oldStatus = $visaBooking->status;
-    $visaBooking->status = $request->status;
-    if ($request->status === 'rejected' && $request->rejection_reason) {
-        $visaBooking->rejection_reason = $request->rejection_reason;
-    }
-
+    $visaBooking->status = $request->status; 
     $visaBooking->save();
 
     // Dispatch the event
     event(new VisaStatusUpdated($visaBooking, $oldStatus, $request->status));
 
-    return response()->json([
-        'status' => true,
-        'message' => 'Visa booking status updated successfully',
-        'visa_booking' => $visaBooking
-    ]);
-}
+    $booking = Booking::where('user_id', $visaBooking->user_id)
+    ->where('type', 'ticket')->where('status', 'pending')->first();
+
+     if ($booking) {
+        $booking->status = $request->status;
+        $booking->save();
+        }
+   
+
+    if ($request->status === 'rejected' && $request->rejection_reason) {
+        $rejectionReason = new RejectionReason([
+            'reason' => $request->rejection_reason,
+            'request_type' => 'Visa',
+            'request_id' => $visaBooking->id,
+            'user_id' => $visaBooking->user_id
+        ]);
+        $rejectionReason->save();
+        return response()->json([
+            'status' => true,
+            'message' => 'Visa booking status updated successfully',
+            'visa_booking' => $visaBooking
+        ]);}
+    }
 
 public function handleHajBookingRequest(Request $request)
 {
@@ -299,7 +313,6 @@ public function handleHajBookingRequest(Request $request)
     }
 
     $hajBooking->status = $request->status;
-    $hajBooking->admin_id = auth()->id();
     $hajBooking->save();
 
     // Update the corresponding booking status
