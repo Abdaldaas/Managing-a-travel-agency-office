@@ -16,14 +16,13 @@ return new class extends Migration
         Schema::create('flights', function (Blueprint $table) {
             $table->id();
             $table->string('flight_number');
-            $table->string('airline');
-            $table->string('departure_city');
-            $table->string('arrival_city');
+            $table->foreignId('departure_airport_id')->constrained('airports');
+            $table->foreignId('arrival_airport_id')->constrained('airports');
             $table->dateTime('departure_time');
             $table->dateTime('arrival_time');
             $table->decimal('price', 10, 2);
             $table->integer('available_seats');
-   
+            $table->enum('status', ['scheduled', 'delayed', 'cancelled', 'completed'])->default('scheduled');
             $table->timestamps();
         });
     }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class TaxiRequest extends Model
 {
@@ -75,5 +76,10 @@ class TaxiRequest extends Model
         $this->price = $baseFare + ($this->distance_km * $pricePerKm);
         
         return $this->price;
+    }
+
+    public function rating(): MorphOne
+    {
+        return $this->morphOne(Rating::class, 'rateable');
     }
 } 

@@ -16,13 +16,17 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name', 120);
-            $table->string('email', 50);
+            $table->string('email', 50)->unique();
             $table->string('password', 70);
-            $table->string('phone', 50);
-            $table->enum('role', ['user', 'admin', 'super_admin'])->default('user');
-            $table->Integer('age');
+            $table->string('phone', 50)->unique();
+            $table->enum('role', ['user', 'admin', 'super_admin', 'driver'])->default('user');
+            $table->Integer('age')->nullable();
+            $table->text('address')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamp('email_verified_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

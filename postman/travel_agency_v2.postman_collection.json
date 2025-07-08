@@ -1,0 +1,486 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6",
+		"name": "Travel Agency API V2",
+		"description": "Updated API collection with complete taxi service endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"12345678\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Taxi Service",
+			"item": [
+				{
+					"name": "User Endpoints",
+					"item": [
+						{
+							"name": "Request Taxi",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"pickup_latitude\": 24.774265,\n    \"pickup_longitude\": 46.738586,\n    \"pickup_address\": \"Al Olaya, Riyadh\",\n    \"destination_latitude\": 24.713552,\n    \"destination_longitude\": 46.675297,\n    \"destination_address\": \"King Khalid International Airport\",\n    \"scheduled_at\": \"2024-07-10 07:00:00\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/taxi/request",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "request"]
+								}
+							}
+						},
+						{
+							"name": "Get Nearby Drivers",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/taxi/drivers/nearby?latitude=24.774265&longitude=46.738586&radius=10",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "drivers", "nearby"],
+									"query": [
+										{
+											"key": "latitude",
+											"value": "24.774265"
+										},
+										{
+											"key": "longitude",
+											"value": "46.738586"
+										},
+										{
+											"key": "radius",
+											"value": "10"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Active Request",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/taxi/request/active",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "request", "active"]
+								}
+							}
+						},
+						{
+							"name": "Rate Trip",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"rating\": 5,\n    \"comment\": \"Excellent service!\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/taxi/requests/1/rate",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "requests", "1", "rate"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Driver Endpoints",
+					"item": [
+						{
+							"name": "Update Location",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"latitude\": 24.774265,\n    \"longitude\": 46.738586\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/taxi/location",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "location"]
+								}
+							}
+						},
+						{
+							"name": "Accept Request",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/taxi/requests/1/accept",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "requests", "1", "accept"]
+								}
+							}
+						},
+						{
+							"name": "Complete Trip",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/taxi/requests/1/complete",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "requests", "1", "complete"]
+								}
+							}
+						},
+						{
+							"name": "Update Status",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"available\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/taxi/status",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "status"]
+								}
+							}
+						},
+						{
+							"name": "Get Trips History",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/taxi/trips?status=completed&date=2024-07-07",
+									"host": ["{{base_url}}"],
+									"path": ["api", "taxi", "trips"],
+									"query": [
+										{
+											"key": "status",
+											"value": "completed"
+										},
+										{
+											"key": "date",
+											"value": "2024-07-07"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Admin Endpoints",
+					"item": [
+						{
+							"name": "Get All Drivers",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/drivers",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "drivers"]
+								}
+							}
+						},
+						{
+							"name": "Get Driver Details",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/drivers/1",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "drivers", "1"]
+								}
+							}
+						},
+						{
+							"name": "Add Driver",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"سائق جديد\",\n    \"email\": \"driver4@example.com\",\n    \"phone\": \"+966501234570\",\n    \"password\": \"12345678\",\n    \"car_model\": \"Toyota Camry\",\n    \"car_plate_number\": \"ABC 124\",\n    \"license_number\": \"DL12345679\",\n    \"address\": \"Riyadh, Saudi Arabia\",\n    \"birth_date\": \"1990-01-01\",\n    \"national_id\": \"1234567890\",\n    \"car_type\": \"sedan\",\n    \"car_year\": \"2022\",\n    \"car_color\": \"White\",\n    \"license_expiry\": \"2025-01-01\",\n    \"insurance_provider\": \"Tawuniya\",\n    \"insurance_policy_number\": \"INS123456\",\n    \"insurance_expiry\": \"2025-01-01\",\n    \"bank_name\": \"Al Rajhi Bank\",\n    \"bank_account\": \"123456789\",\n    \"bank_iban\": \"SA1234567890123456789012\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/drivers",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "drivers"]
+								}
+							}
+						},
+						{
+							"name": "Update Driver",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"unavailable\",\n    \"car_model\": \"Toyota Camry 2023\",\n    \"license_expiry\": \"2026-01-01\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/drivers/1",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "drivers", "1"]
+								}
+							}
+						},
+						{
+							"name": "Delete Driver",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/drivers/1",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "drivers", "1"]
+								}
+							}
+						},
+						{
+							"name": "Get All Requests",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/requests?status=completed&date=2024-07-07",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "requests"],
+									"query": [
+										{
+											"key": "status",
+											"value": "completed"
+										},
+										{
+											"key": "date",
+											"value": "2024-07-07"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Driver Trips",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/drivers/1/trips?status=completed&date=2024-07-07",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "drivers", "1", "trips"],
+									"query": [
+										{
+											"key": "status",
+											"value": "completed"
+										},
+										{
+											"key": "date",
+											"value": "2024-07-07"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Statistics",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/admin/taxi/statistics",
+									"host": ["{{base_url}}"],
+									"path": ["api", "admin", "taxi", "statistics"]
+								}
+							}
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000"
+		}
+	]
+} 

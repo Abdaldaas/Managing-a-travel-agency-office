@@ -11,9 +11,12 @@ return new class extends Migration
         Schema::create('taxi_drivers', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
+            $table->string('national_id')->unique();
             $table->string('car_model');
-            $table->string('car_plate_number');
-            $table->string('license_number');
+            $table->string('car_plate_number')->unique();
+            $table->string('license_number')->unique();
+            $table->string('address');
+            $table->date('birth_date');
             $table->enum('status', ['available', 'busy', 'offline'])->default('offline');
             $table->decimal('current_latitude', 10, 8)->nullable();
             $table->decimal('current_longitude', 11, 8)->nullable();

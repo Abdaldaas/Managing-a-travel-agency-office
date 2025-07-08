@@ -101,6 +101,6 @@ class User extends Authenticatable
      */
     public function isTaxiDriver(): bool
     {
-        return $this->role === 'taxi_driver';
+        return $this->role === 'driver';
     }
 }

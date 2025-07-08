@@ -5,7 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Rating;
+use App\Models\TaxiRequest;
 
 class TaxiDriver extends Model
 {
@@ -91,5 +94,45 @@ class TaxiDriver extends Model
             cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
 
         return $angle * $earthRadius;
+    }
+
+    /**
+     * Get all completed trips for this driver
+     */
+    public function completedTrips(): HasMany
+    {
+        return $this->hasMany(TaxiRequest::class, 'driver_id')
+                    ->where('status', 'completed');
+    }
+
+    /**
+     * Get all trips for this driver
+     */
+    public function trips(): HasMany
+    {
+        return $this->hasMany(TaxiRequest::class, 'driver_id');
+    }
+
+    /**
+     * Get all ratings for this driver through their completed trips
+     */
+    public function ratings(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Rating::class,
+            TaxiRequest::class,
+            'driver_id', // Foreign key on taxi_requests table
+            'rateable_id', // Foreign key on ratings table
+            'id', // Local key on taxi_drivers table
+            'id' // Local key on taxi_requests table
+        )->where('rateable_type', TaxiRequest::class);
+    }
+
+    /**
+     * Get the average rating for this driver
+     */
+    public function getAverageRatingAttribute(): float
+    {
+        return $this->ratings()->avg('star') ?? 0.0;
     }
 } 
