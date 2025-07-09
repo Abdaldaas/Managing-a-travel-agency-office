@@ -26,10 +26,14 @@ return new class extends Migration
             $table->string('nationality');
             $table->enum('gender', ['male', 'female']);
             $table->string('national_number')->unique();
-            $table->enum('passport_type', ['regular', 'urgent']);
+            $table->enum('passport_type', ['regular', 'urgent', 'express']);
             $table->integer('num_dependents')->default(0);
+            $table->json('dependent_details');
             $table->string('identity_front');
             $table->string('identity_back');
+            $table->string('personal_photo');
+            $table->string('old_passport_page1')->nullable();
+            $table->string('old_passport_page2')->nullable();
             $table->boolean('has_old_passport')->default(false);
 
             $table->timestamps();

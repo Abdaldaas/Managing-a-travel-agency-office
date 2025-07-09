@@ -11,28 +11,28 @@ use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\TaxiController;
 use App\Http\Controllers\AuthController;
 
-// Public routes
+
 Route::get('/weather', [WeatherController::class, 'getWeather']);
 Route::post('/register', [UserController::class, 'registeruser']);
 Route::post('/login', [UserController::class, 'login']);
 
-// Driver authentication routes
+
 Route::post('/driver/login', [AuthController::class, 'driverLogin']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/driver/logout', [AuthController::class, 'logout']);
 });
 
-// User routes
+
 Route::middleware('auth:sanctum')->group(function () {
-    // طلبات التأشيرة
+   
     Route::post('/visa/request', [UserController::class, 'requestVisa']);
-    // طلبات التذاكر
+ 
     Route::post('/ticket/request', [UserController::class, 'requestTicket']);
-    // طلبات جواز السفر
+
     Route::post('/passport/request', [UserController::class, 'requestPassport']);
-    // طلبات الحج
+   
     Route::post('/haj/request', [UserController::class, 'requestHaj']);
-    // الإشعارات
+
     Route::get('/notifications', [UserController::class, 'getNotifications']);
     Route::patch('/notifications/{id}/mark-as-read', [UserController::class, 'markNotificationAsRead']);
     Route::delete('/notifications/{id}', [UserController::class, 'deleteNotification']);
@@ -41,7 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bookings', [UserController::class, 'getBookings']);
     Route::delete('/bookings/{id}', [UserController::class, 'cancelBooking']);
    
-    // Taxi routes
+    
     Route::post('/taxi/request', [TaxiController::class, 'requestTaxi']);
     Route::get('/taxi/requests', [TaxiController::class, 'getUserRequests']);
     Route::delete('/taxi/requests/{id}', [TaxiController::class, 'cancelRequest']);
@@ -50,33 +50,33 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('rate/{taxi_request}', [TaxiController::class, 'rateTrip']);
 });
 
-// Admin login
+
 Route::post('/admin/login', [AdminController::class, 'adminLogin']);
 
-// Admin routes
+
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
-    // User management
+
     Route::get('/admin/users', [AdminController::class, 'getAllUsers']);
     Route::get('/admin/users/{id}', [AdminController::class, 'getUserDetails']);
     
-    // Booking management
+    
     Route::get('/admin/bookings', [AdminController::class, 'viewAllBookings']);
     Route::get('/admin/bookings/{id}', [AdminController::class, 'getBookingDetails']);
     Route::put('/admin/bookings/{id}/status', [AdminController::class, 'updateBookingStatus']);
     
-    // Visa management
+  
     Route::get('/admin/visa-bookings', [AdminController::class, 'getAllVisaBookings']);
     Route::post('/admin/visa-booking/update', [AdminController::class, 'updateVisaBooking']);
     
-    // Passport management
+
     Route::get('/admin/passport-requests', [AdminController::class, 'getAllPassportRequests']);
     Route::post('/admin/passport-request/handle', [AdminController::class, 'handlePassportRequest']);
     
-    // Ticket management
+ 
     Route::get('/admin/ticket-requests', [AdminController::class, 'getAllTicketRequests']);
     Route::post('/admin/ticket-request/handle', [AdminController::class, 'handleTicketRequest']);
     
-    // Haj booking management
+
     Route::get('/admin/haj-bookings', [AdminController::class, 'getAllHajBookings']);
     Route::post('/admin/haj-booking/handle', [AdminController::class, 'handleHajBookingRequest']);
     
@@ -105,7 +105,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/notifications', [AdminController::class, 'getNotifications']);
     Route::patch('/admin/notifications/{id}/mark-as-read', [AdminController::class, 'markNotificationAsRead']);
     Route::delete('/admin/notifications/{id}', [AdminController::class, 'deleteNotification']);
-    Route::get('/admin/passports/{id}', [AdminController::class, 'getPassportDetails']);
+    Route::get('/passports/{id}', [AdminController::class, 'getPassportDetails']);
 });
 
 // Taxi routes

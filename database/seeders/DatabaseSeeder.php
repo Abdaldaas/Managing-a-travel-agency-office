@@ -12,6 +12,7 @@ use App\Models\Airport;
 use App\Models\TaxiDriver;
 use App\Models\RejectionReason;
 use Illuminate\Support\Facades\Hash;
+use Database\Seeders\PassportSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -22,6 +23,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
+        // Run the passport seeder
+        $this->call(PassportSeeder::class);
+
         // Create admin user
         User::create([
             'name' => 'Admin',
@@ -148,9 +152,12 @@ class DatabaseSeeder extends Seeder
                         'phone' => '+966501234567',
                         'role' => 'driver'
                     ])->id,
+                    'national_id' => '1234567890',
                     'car_model' => 'Toyota Camry',
                     'car_plate_number' => 'ABC 123',
                     'license_number' => 'DL12345678',
+                    'address' => 'حي النزهة، الرياض',
+                    'birth_date' => '1990-01-01',
                     'status' => 'available',
                     'current_latitude' => 24.774265,
                     'current_longitude' => 46.738586,
@@ -165,9 +172,12 @@ class DatabaseSeeder extends Seeder
                         'phone' => '+966501234568',
                         'role' => 'driver'
                     ])->id,
+                    'national_id' => '1234567891',
                     'car_model' => 'Honda Accord',
                     'car_plate_number' => 'XYZ 789',
                     'license_number' => 'DL87654321',
+                    'address' => 'حي العليا، الرياض',
+                    'birth_date' => '1988-05-15',
                     'status' => 'available',
                     'current_latitude' => 24.774265,
                     'current_longitude' => 46.738586,
@@ -182,9 +192,12 @@ class DatabaseSeeder extends Seeder
                         'phone' => '+966501234569',
                         'role' => 'driver'
                     ])->id,
+                    'national_id' => '1234567892',
                     'car_model' => 'Hyundai Sonata',
                     'car_plate_number' => 'DEF 456',
                     'license_number' => 'DL98765432',
+                    'address' => 'حي الملز، الرياض',
+                    'birth_date' => '1992-08-20',
                     'status' => 'available',
                     'current_latitude' => 24.774265,
                     'current_longitude' => 46.738586,

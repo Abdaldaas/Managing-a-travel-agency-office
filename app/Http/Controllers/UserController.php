@@ -16,6 +16,7 @@ use App\Models\HajBooking;
 
 use App\Models\PassportRequest;
 use App\Models\User;
+use Carbon\Carbon;
 
 use App\Events\PassportRequested;
 use App\Events\VisaRequested;
@@ -23,10 +24,10 @@ use App\Events\TicketRequested;
 use Illuminate\Notifications\DatabaseNotification;
 
 class UserController extends Controller {
-    public function requestPassport(Request $request)
+     public function requestPassport(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'passport_type' => 'required|in:regular,urgent',
+            'passport_type' => 'required|in:regular,urgent,express',
             'first_name' => 'required|string|min:2',
             'last_name' => 'required|string|min:2',
             'father_name' => 'required|string',
@@ -34,11 +35,14 @@ class UserController extends Controller {
             'date_of_birth' => 'required|date',
             'place_of_birth' => 'required|string',
             'nationality' => 'required|string',
-            'national_number' => 'required|string',
+            'national_number' => 'required|string|unique:passports,national_number',
             'gender' => 'required|in:male,female',
             'identity_front' => 'required|file',
             'identity_back' => 'required|file',
-            'num_dependents'=>'required|integer|max:2',
+            'personal_photo' => 'required|file',
+            'old_passport_page1' => 'nullable|file|required_if:has_old_passport,true,1',
+            'old_passport_page2' => 'nullable|file|required_if:has_old_passport,true,1',
+            'num_dependents'=>'nullable|integer|max:2',
             'dependent_details' => 'nullable|array',
             'has_old_passport' => 'required|in:true,false,0,1'
         ]);
@@ -51,58 +55,96 @@ class UserController extends Controller {
             ], 400);
         }
 
-        $identity_front = $request->file('identity_front')->store('identity_front');
-        $identity_back =$request->file('identity_back')->store('identity_back');
-        do {
-            $passport_number = 'P' . mt_rand(10000000, 99999999);
-        } while (Passport::where('passport_number', $passport_number)->exists());
+        $age = Carbon::parse($request->date_of_birth)->age;
 
-        $passport = Passport::create([
-            'user_id' => auth()->id(),
-            'passport_number' => $passport_number,
-            'passport_type' => $request->passport_type,
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'father_name' => $request->father_name,
-            'mother_name' => $request->mother_name,
-            'date_of_birth' => $request->date_of_birth,
-            'place_of_birth' => $request->place_of_birth,
-            'nationality' => $request->nationality,
-            'national_number' => $request->national_number,
-            'gender' => $request->gender,
-            'identity_front' => $identity_front,
-            'identity_back'=> $identity_back,
-            'num_dependents' => $request->num_dependents,
-            'dependent_details' => $request->dependent_details,
-            'has_old_passport' => filter_var($request->has_old_passport, FILTER_VALIDATE_BOOLEAN)
-        ]);
+        $dependentDetails = $request->dependent_details;
+        $numDependents = $request->num_dependents;
 
-        $passportRequest = new PassportRequest();
-        $passportRequest->user_id = auth()->id();
-        $passportRequest->passport_id = $passport->id;
-        $passportRequest->passport_type = $request->passport_type;
-        $passportRequest->status = 'processing';
-        $passportRequest->calculatePrice();
-        $passportRequest->save();
+        if ($age < 18) {
+            if (empty($dependentDetails) || $numDependents < 1) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Dependent details and number of dependents are required for applicants under 18.',
+                ], 400);
+            }
+        } else {
+            $dependentDetails = null;
+            $numDependents = 0;
+        }
 
-        // Dispatch the event
-        event(new PassportRequested($passportRequest));
+        try {
+            $personal_photo = null;
+            if ($request->hasFile('personal_photo') && $request->file('personal_photo')->isValid()) {
+                $personal_photo = $request->file('personal_photo')->store('personal_photos', 'public');
+            }
 
-        $booking = Booking::create([
-            'user_id' => auth()->id(),
-            'user_name' => auth()->user()->name,
-            'type' => 'passport',
-            'status' => 'processing',
-            'price' => $passportRequest->price
-        ]);
+            $identity_front = $request->file('identity_front')->store('identity_front', 'public');
+            $identity_back = $request->file('identity_back')->store('identity_back', 'public');
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Passport request submitted successfully',
-            'passport' => $passport,
-            'passport_request' => $passportRequest,
-            'booking' => $booking
-        ], 201);
+            $old_passport_page1 = $request->hasFile('old_passport_page1') ? $request->file('old_passport_page1')->store('old_passports', 'public') : null;
+            $old_passport_page2 = $request->hasFile('old_passport_page2') ? $request->file('old_passport_page2')->store('old_passports', 'public') : null;
+
+            do {
+                $passport_number = 'P' . mt_rand(10000000, 99999999);
+            } while (Passport::where('passport_number', $passport_number)->exists());
+
+            $passport = Passport::create([
+                'user_id' => auth()->id(),
+                'passport_number' => $passport_number,
+                'passport_type' => $request->passport_type,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'father_name' => $request->father_name,
+                'mother_name' => $request->mother_name,
+                'date_of_birth' => $request->date_of_birth,
+                'place_of_birth' => $request->place_of_birth,
+                'nationality' => $request->nationality,
+                'national_number' => $request->national_number,
+                'gender' => $request->gender,
+                'identity_front' => $identity_front,
+                'identity_back'=> $identity_back,
+                'personal_photo' => $personal_photo,
+                'old_passport_page1' => $old_passport_page1,
+                'old_passport_page2' => $old_passport_page2,
+                'num_dependents' => $numDependents,
+                'dependent_details' => json_encode($dependentDetails),
+                'has_old_passport' => filter_var($request->has_old_passport, FILTER_VALIDATE_BOOLEAN)
+            ]);
+
+            $passportRequest = new PassportRequest();
+            $passportRequest->user_id = auth()->id();
+            $passportRequest->passport_id = $passport->id;
+            $passportRequest->passport_type = $request->passport_type;
+            $passportRequest->status = 'processing';
+            $passportRequest->calculatePrice();
+            $passportRequest->save();
+
+            // Dispatch the event
+            event(new PassportRequested($passportRequest));
+
+            $booking = Booking::create([
+                'user_id' => auth()->id(),
+                'user_name' => auth()->user()->name,
+                'type' => 'passport',
+                'status' => 'processing',
+                'price' => $passportRequest->price
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Passport request submitted successfully',
+                'passport' => $passport,
+                'passport_request' => $passportRequest,
+                'booking' => $booking
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error processing passport request',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
     public function registeruser(Request $request)
     {

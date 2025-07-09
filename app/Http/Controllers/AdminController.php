@@ -600,74 +600,69 @@ public function deleteNotification($id)
     }
 }
 
-/**
- * Get detailed passport information by ID
- * 
- * @param int $id Passport ID
- * @return \Illuminate\Http\JsonResponse
- */
+
 public function getPassportDetails($id)
-{
-    // Check admin authorization
-    if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
-        return response()->json([
-            'status' => false,
-            'message' => 'You are not authorized to access this resource'
-        ], 403);
+    {
+        if (!auth()->user() || !in_array(auth()->user()->role, ['admin'])) {
+            return response()->json([
+                'status' => false,
+                'message' => 'You are not authorized to access this resource'
+            ], 403);
+        }
+        try {
+            $passport = Passport::with(['user' => function ($query) {
+                $query->select('id', 'name', 'email', 'phone');
+            }])->findOrFail($id);
+            if (!$passport ){ 
+                return response()->json(['status' => false,
+                'message' => 'Passport not found.' ], 404);}
+            $response = [
+                'id' => $passport->id,
+                'user' => $passport->user,
+                'passport_number' => $passport->passport_number,
+
+                'personal_info' => [
+                    'first_name' => $passport->first_name,
+                    'last_name' => $passport->last_name,
+                    'father_name' => $passport->father_name,
+                    'mother_name' => $passport->mother_name,
+                    'date_of_birth' => $passport->date_of_birth,
+                    'place_of_birth' => $passport->place_of_birth,
+                    'gender' => $passport->gender,
+                    'personal_photo' => $passport->personal_photo,
+                ],
+                'nationality_info' => [ 
+                    'nationality' => $passport->nationality,
+                    'national_number' => $passport->national_number
+                ],
+                'passport_details' => [
+                    'type' => $passport->passport_type,
+                    'num_dependents' => $passport->num_dependents,
+                    'has_old_passport' => $passport->has_old_passport,
+                    'dependent_details' => $passport->dependent_details,
+                ],
+                'documents' => [
+               
+                    'identity_front' => $passport->identity_front,
+                    'identity_back' => $passport->identity_back,
+                    'old_passport_page1' => $passport->old_passport_page1 ,
+                    'old_passport_page2' => $passport->old_passport_page2 ,
+                ],
+                'created_at' => $passport->created_at,
+                'updated_at' => $passport->updated_at
+            ];
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Passport details retrieved successfully',
+                'passport' => $response
+            ]);
+         
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving passport details: ' . $e->getMessage()
+            ], 500);
+        }
     }
-
-    try {
-        // Get passport with user information
-        $passport = Passport::with(['user' => function($query) {
-            $query->select('id', 'name', 'email', 'phone');
-        }])->findOrFail($id);
-
-        // Format the response data
-        $response = [
-            'id' => $passport->id,
-            'user' => $passport->user,
-            'passport_number' => $passport->passport_number,
-            // Personal information group
-            'personal_info' => [
-                'first_name' => $passport->first_name,
-                'last_name' => $passport->last_name,
-                'father_name' => $passport->father_name,
-                'mother_name' => $passport->mother_name,
-                'date_of_birth' => $passport->date_of_birth,
-                'place_of_birth' => $passport->place_of_birth,
-                'gender' => $passport->gender
-            ],
-            // Nationality information
-            'nationality' => [
-                'nationality' => $passport->nationality,
-                'national_number' => $passport->national_number
-            ],
-            // Passport specific details
-            'passport_details' => [
-                'type' => $passport->passport_type,
-                'num_dependents' => $passport->num_dependents,
-                'has_old_passport' => $passport->has_old_passport
-            ],
-            // Attached documents
-            'documents' => [
-                'identity_front' => $passport->identity_front,
-                'identity_back' => $passport->identity_back
-            ],
-            'created_at' => $passport->created_at,
-            'updated_at' => $passport->updated_at
-        ];
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Passport details retrieved successfully',
-            'passport' => $response
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Error retrieving passport details: ' . $e->getMessage()
-        ], 500);
-    }
-}
 }

@@ -10,6 +10,7 @@ class Passport extends Model
     protected $fillable = [
         'user_id',
         'passport_number',
+        'passport_type',
         'first_name',
         'last_name',
         'father_name',
@@ -19,11 +20,14 @@ class Passport extends Model
         'nationality',
         'national_number',
         'gender',
-        'passport_type',
-        'num_dependents',
         'identity_front',
         'identity_back',
-        'has_old_passport'
+        'personal_photo', 
+        'old_passport_page1',
+        'old_passport_page2',
+        'num_dependents',
+        'dependent_details',
+        'has_old_passport',
     ];
 
     protected $casts = [
