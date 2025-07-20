@@ -1,4 +1,4 @@
-co<?php
+<?php
 
 namespace Database\Seeders;
 
@@ -13,7 +13,7 @@ class PassportSeeder extends Seeder
 {
     public function run()
     {
-        // Create three example users first
+      
         $user1 = User::create([
             'name' => 'Ahmed Ali',
             'email' => 'ahmed@example.com',

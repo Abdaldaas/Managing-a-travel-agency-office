@@ -224,4 +224,14 @@ class FlightController extends Controller
             'flights' => $flights
         ]);
     }
+    public function getAirports()
+    {
+        $airports = Airport::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'iata_code', 'city', 'country']);
+        return response()->json([
+            'status' => true,
+            'airports' => $airports
+        ]);
+    }
 }

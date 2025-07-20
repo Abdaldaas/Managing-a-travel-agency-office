@@ -18,9 +18,6 @@ use App\Models\Rating;
 
 class TaxiController extends Controller
 {
-    /**
-     * Request a taxi for a booking
-     */
     public function requestTaxi(Request $request)
     {
         $messages = [
@@ -51,7 +48,7 @@ class TaxiController extends Controller
                 'scheduled_at' => 'required|date|after:now'
             ], $messages);
 
-            // Verify ticket request belongs to current user
+            
             $ticketRequest = TicketRequest::where('id', $validated['ticket_request_id'])
                 ->where('user_id', auth()->id())
                 ->first();
@@ -63,7 +60,6 @@ class TaxiController extends Controller
                 ], 403);
             }
 
-            // Check if taxi request already exists for this ticket
             $existingRequest = TaxiRequest::where('booking_id', $validated['ticket_request_id'])
                 ->whereNotIn('status', ['cancelled', 'completed'])
                 ->first();
@@ -82,7 +78,6 @@ class TaxiController extends Controller
             ], 422);
         }
 
-        // Get ticket and flight information
         $ticketRequest = TicketRequest::with(['flight.departureAirport'])->findOrFail($validated['ticket_request_id']);
         $flight = $ticketRequest->flight;
         $airport = $flight->departureAirport;
@@ -94,7 +89,7 @@ class TaxiController extends Controller
             ], 400);
         }
 
-        // Calculate distance and price
+        
         $distance = $this->calculateDistance(
             $validated['pickup_latitude'],
             $validated['pickup_longitude'],
@@ -102,7 +97,7 @@ class TaxiController extends Controller
             $airport->longitude
         );
 
-        // Create taxi request
+       
         $taxiRequest = TaxiRequest::create([
             'user_id' => auth()->id(),
             'booking_id' => $ticketRequest->id,
@@ -125,12 +120,9 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Calculate distance between two points using Haversine formula
-     */
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
-        $r = 6371; // Earth's radius in kilometers
+        $r = 6371; 
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
         $a = sin($dLat/2) * sin($dLat/2) +
@@ -140,19 +132,13 @@ class TaxiController extends Controller
         return round($r * $c, 2);
     }
 
-    /**
-     * Calculate price based on distance
-     */
     private function calculatePrice($distance)
     {
-        $basePrice = 5; // Base fare in currency
-        $pricePerKm = 0.5; // Price per kilometer
+        $basePrice = 5; 
+        $pricePerKm = 0.5; 
         return round($basePrice + ($distance * $pricePerKm), 2);
     }
 
-    /**
-     * Get destination coordinates and address based on booking type
-     */
     private function getDestinationByBookingType($type)
     {
         switch ($type) {
@@ -174,9 +160,6 @@ class TaxiController extends Controller
         }
     }
 
-    /**
-     * Find nearest available drivers
-     */
     private function findNearestDrivers($latitude, $longitude, $maxDistance = null, $limit = null)
     {
         if ($maxDistance === null) {
@@ -201,12 +184,9 @@ class TaxiController extends Controller
             ->get();
     }
 
-    /**
-     * Accept a taxi request (for drivers)
-     */
     public function acceptRequest(Request $request, $requestId)
     {
-        // Get the authenticated user
+      
         $user = auth()->user();
         $driver = TaxiDriver::where('user_id', $user->id)->first();
 
@@ -237,9 +217,6 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Update driver's current location
-     */
     public function updateLocation(Request $request)
     {
         try {
@@ -256,7 +233,7 @@ class TaxiController extends Controller
                 ], 400);
             }
 
-            // Get the authenticated user
+            
             $user = auth()->user();
             $driver = TaxiDriver::where('user_id', $user->id)->first();
 
@@ -284,12 +261,9 @@ class TaxiController extends Controller
         }
     }
 
-    /**
-     * Complete a taxi trip
-     */
     public function completeTrip(Request $request, $requestId)
     {
-        // Get the authenticated user
+        
         $user = auth()->user();
         $driver = TaxiDriver::where('user_id', $user->id)->first();
 
@@ -327,9 +301,6 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Get all drivers with their statistics
-     */
     public function getAllDrivers()
     {
         $drivers = TaxiDriver::with(['user', 'completedTrips'])
@@ -358,16 +329,13 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Get detailed information about a specific driver
-     */
     public function getDriverDetails($id)
     {
         $driver = TaxiDriver::with(['user', 'completedTrips', 'trips'])
             ->withCount(['trips as total_trips', 'completedTrips as completed_trips'])
             ->findOrFail($id);
 
-        // Get recent trips
+        
         $recentTrips = $driver->trips()
             ->with(['user', 'rating'])
             ->latest()
@@ -391,7 +359,7 @@ class TaxiController extends Controller
                 ];
             });
 
-        // Calculate statistics
+        
         $avgRating = $driver->ratings()->avg('star') ?? 0;
         $totalEarnings = $driver->completedTrips()->sum('price');
         $totalDistance = $driver->completedTrips()->sum('distance_km');
@@ -419,9 +387,6 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Add a new taxi driver
-     */
     public function addDriver(Request $request)
     {
         try {
@@ -440,7 +405,7 @@ class TaxiController extends Controller
 
             DB::beginTransaction();
 
-            // Create user account
+     
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -448,8 +413,6 @@ class TaxiController extends Controller
                 'password' => Hash::make($validated['password']),
                 'role' => 'driver'
             ]);
-
-            // Create driver profile
             $driver = TaxiDriver::create([
                 'user_id' => $user->id,
                 'national_id' => $validated['national_id'],
@@ -486,9 +449,6 @@ class TaxiController extends Controller
         }
     }
 
-    /**
-     * Update driver information
-     */
     public function updateDriver(Request $request, $id)
     {
         $driver = TaxiDriver::findOrFail($id);
@@ -526,14 +486,14 @@ class TaxiController extends Controller
         try {
             DB::beginTransaction();
 
-            // Update user information
+           
             if ($request->has('name')) $user->name = $request->name;
             if ($request->has('email')) $user->email = $request->email;
             if ($request->has('phone')) $user->phone = $request->phone;
             if ($request->has('address')) $user->address = $request->address;
             $user->save();
 
-            // Update driver information
+           
             $driver->fill($request->only([
                 'car_model', 'car_plate_number', 'license_number', 'status',
                 'car_type', 'car_year', 'car_color', 'license_expiry',
@@ -559,15 +519,11 @@ class TaxiController extends Controller
         }
     }
 
-    /**
-     * Delete a taxi driver
-     */
+ 
     public function deleteDriver($id)
     {
         try {
             $driver = TaxiDriver::with('trips')->findOrFail($id);
-
-            // Check for active trips
             $hasActiveTrips = $driver->trips()
                 ->whereNotIn('status', ['completed', 'cancelled'])
                 ->exists();
@@ -579,19 +535,11 @@ class TaxiController extends Controller
                 ], 400);
             }
 
-            // Get the user ID before deleting the driver
             $userId = $driver->user_id;
-
             DB::beginTransaction();
-
-            // Delete the driver record
             $driver->delete();
-
-            // Delete the associated user account
             User::where('id', $userId)->delete();
-
             DB::commit();
-
             return response()->json([
                 'status' => true,
                 'message' => 'Driver deleted successfully'
@@ -606,9 +554,7 @@ class TaxiController extends Controller
         }
     }
 
-    /**
-     * Get all taxi requests with their details
-     */
+  
     public function getAllRequests(Request $request)
     {
         $query = TaxiRequest::with(['user', 'driver.user'])
@@ -633,30 +579,27 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Get taxi service statistics
-     */
     public function getStatistics()
     {
         try {
-            // Driver statistics
+            
             $totalDrivers = TaxiDriver::count();
             $activeDrivers = TaxiDriver::where('status', 'available')->count();
             $busyDrivers = TaxiDriver::where('status', 'busy')->count();
             $offlineDrivers = TaxiDriver::where('status', 'offline')->count();
 
-            // Trip statistics
+       
             $totalTrips = TaxiRequest::count();
             $completedTrips = TaxiRequest::where('status', 'completed')->count();
             $cancelledTrips = TaxiRequest::where('status', 'cancelled')->count();
             $activeTrips = TaxiRequest::whereIn('status', ['pending', 'accepted'])->count();
 
-            // Revenue statistics
+          
             $totalRevenue = TaxiRequest::where('status', 'completed')->sum('price');
             $averageTripPrice = TaxiRequest::where('status', 'completed')->avg('price') ?? 0;
             $totalDistance = TaxiRequest::where('status', 'completed')->sum('distance_km');
 
-            // Rating statistics
+          
             $averageRating = DB::table('ratings')
                 ->join('taxi_requests', function ($join) {
                     $join->on('ratings.rateable_id', '=', 'taxi_requests.id')
@@ -664,13 +607,13 @@ class TaxiController extends Controller
                 })
                 ->avg('star') ?? 0;
 
-            // Time-based statistics
+            
             $todayTrips = TaxiRequest::whereDate('created_at', today())->count();
             $todayRevenue = TaxiRequest::whereDate('created_at', today())
                 ->where('status', 'completed')
                 ->sum('price');
 
-            // Most active drivers
+           
             $topDrivers = TaxiDriver::withCount(['completedTrips'])
                 ->with('user')
                 ->orderBy('completed_trips_count', 'desc')
@@ -723,9 +666,6 @@ class TaxiController extends Controller
         }
     }
 
-    /**
-     * Get available drivers near a location
-     */
     public function getNearbyDrivers(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -742,7 +682,7 @@ class TaxiController extends Controller
             ], 422);
         }
 
-        $radius = $request->radius ?? 10; // Default 10 km radius
+        $radius = $request->radius ; 
 
         $drivers = $this->findNearestDrivers(
             $request->latitude,
@@ -756,9 +696,6 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Get user's active taxi request
-     */
     public function getUserActiveRequest()
     {
         $activeRequest = TaxiRequest::with(['driver.user'])
@@ -773,90 +710,32 @@ class TaxiController extends Controller
         ]);
     }
 
-    /**
-     * Get driver's trip history with filters
-     */
-    public function getDriverTrips(Request $request)
+    public function getDriverTrips()
     {
-        try {
-            // Get the authenticated driver
-            $driver = TaxiDriver::where('user_id', auth()->id())->firstOrFail();
-
-            // Build query with filters
-            $query = $driver->trips()
-                ->with(['user', 'rating'])
-                ->when($request->status, function($q) use ($request) {
-                    return $q->where('status', $request->status);
-                })
-                ->when($request->date, function($q) use ($request) {
-                    return $q->whereDate('created_at', $request->date);
-                })
-                ->when($request->from_date, function($q) use ($request) {
-                    return $q->whereDate('created_at', '>=', $request->from_date);
-                })
-                ->when($request->to_date, function($q) use ($request) {
-                    return $q->whereDate('created_at', '<=', $request->to_date);
-                });
-
-            // Add sorting
-            $sortBy = $request->sort_by ?? 'created_at';
-            $sortOrder = $request->sort_order ?? 'desc';
-            $query->orderBy($sortBy, $sortOrder);
-
-            // Paginate results
-            $perPage = $request->per_page ?? 10;
-            $trips = $query->paginate($perPage);
-
-            // Transform trip data
-            $trips->getCollection()->transform(function ($trip) {
-                return [
-                    'id' => $trip->id,
-                    'user' => [
-                        'id' => $trip->user->id,
-                        'name' => $trip->user->name,
-                        'phone' => $trip->user->phone
-                    ],
-                    'pickup_address' => $trip->pickup_address,
-                    'destination_address' => $trip->destination_address,
-                    'status' => $trip->status,
-                    'price' => $trip->price,
-                    'distance_km' => $trip->distance_km,
-                    'scheduled_at' => $trip->scheduled_at,
-                    'completed_at' => $trip->completed_at,
-                    'rating' => $trip->rating ? [
-                        'star' => $trip->rating->star,
-                        'comment' => $trip->rating->comment
-                    ] : null,
-                    'created_at' => $trip->created_at
-                ];
-            });
-
+        $driver = TaxiDriver::where('user_id', auth()->id())->firstOrFail();
+        $trips = TaxiRequest::where('driver_id', $driver->id)->get();
+        if ($trips->isEmpty()) {
             return response()->json([
                 'status' => true,
-                'message' => 'Trip history fetched successfully',
-                'data' => $trips
+                'message' => 'you do not have any trips',
+                'data' => []
             ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Error fetching trip history: ' . $e->getMessage()
-            ], 500);
         }
+        return response()->json([
+            'status' => true,
+            'data' => $trips
+        ]);
     }
 
-    /**
-     * Rate a completed trip
-     */
     public function rateTrip(Request $request, TaxiRequest $taxi_request)
     {
-        // Validate request
+
         $validated = $request->validate([
             'rating' => 'required|integer|between:1,5',
             'comment' => 'nullable|string|max:500'
         ]);
 
-        // Check if user owns this trip
+    
         if ($taxi_request->user_id !== auth()->id()) {
             return response()->json([
                 'status' => false,
@@ -864,7 +743,7 @@ class TaxiController extends Controller
             ], 403);
         }
 
-        // Check if trip is completed
+
         if ($taxi_request->status !== 'completed') {
             return response()->json([
                 'status' => false,
@@ -872,7 +751,7 @@ class TaxiController extends Controller
             ], 400);
         }
 
-        // Check if already rated
+
         if ($taxi_request->rating()->exists()) {
             return response()->json([
                 'status' => false,
@@ -880,7 +759,7 @@ class TaxiController extends Controller
             ], 400);
         }
 
-        // Create rating
+    
         $rating = new Rating([
             'user_id' => auth()->id(),
             'star' => $validated['rating'],
@@ -897,4 +776,39 @@ class TaxiController extends Controller
             'data' => $rating
         ]);
     }
+
+    /**
+     * إرجاع جميع الطلبات الخاصة بالسائق الحالي من جدول TaxiRequest بدون أي معالجة إضافية
+     */
+    public function getDriverRequests()
+    {
+        $driver = TaxiDriver::where('user_id', auth()->id())->firstOrFail();
+        $requests = TaxiRequest::where('driver_id', $driver->id)->get();
+        if ($requests->isEmpty()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'you do not have any requests',
+                'data' => []
+            ]);
+        }
+        return response()->json([
+            'status' => true,
+            'data' => $requests
+        ]);
+    }
+
+   
+    public function getDriverIncomingRequests()
+    {
+        $driver = TaxiDriver::where('user_id', auth()->id())->firstOrFail();
+        $requests = TaxiRequest::where('driver_id', $driver->id)
+            ->whereIn('status', ['pending', 'accepted', 'in_progress'])
+            ->get();
+            return response()->json([
+            'status' => true,
+            'data' => $requests
+        ]);
+    }
+
+   
 } 

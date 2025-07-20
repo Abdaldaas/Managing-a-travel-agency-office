@@ -10,9 +10,6 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    /**
-     * تسجيل دخول السائق
-     */
     public function driverLogin(Request $request)
     {
         try {
@@ -25,12 +22,12 @@ class AuthController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'خطأ في البيانات المدخلة',
+                    'message' => 'validation error',
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            // البحث عن المستخدم إما بالبريد الإلكتروني أو رقم الهاتف
+
             $user = User::where('role', 'driver')
                 ->where(function($query) use ($request) {
                     if ($request->has('email')) {
@@ -45,20 +42,19 @@ class AuthController extends Controller
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'بيانات الدخول غير صحيحة'
+                    'message' => 'incorrect credentials'
                 ], 401);
             }
 
-            // التحقق من وجود بيانات السائق
             $driver = TaxiDriver::where('user_id', $user->id)->first();
             if (!$driver) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'لم يتم العثور على بيانات السائق'
+                    'message' => 'user not found'
                 ], 404);
             }
 
-            // التحقق من حالة السائق
+       
             if ($driver->status === 'suspended') {
                 return response()->json([
                     'status' => false,
@@ -66,16 +62,16 @@ class AuthController extends Controller
                 ], 403);
             }
 
-            // إنشاء رمز التوثيق
+       
             $token = $user->createToken('driver_auth_token')->plainTextToken;
 
-            // تحديث حالة السائق إلى متاح
+      
             $driver->status = 'available';
             $driver->save();
 
             return response()->json([
                 'status' => true,
-                'message' => 'تم تسجيل الدخول بنجاح',
+                'message' => 'logged in successfully',
                 'data' => [
                     'user' => [
                         'id' => $user->id,
@@ -100,36 +96,32 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'حدث خطأ أثناء تسجيل الدخول',
+                'message' => 'error while logging in',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    /**
-     * تسجيل خروج السائق
-     */
     public function logout(Request $request)
     {
         try {
-            // تحديث حالة السائق إلى غير متصل
+       
             $driver = TaxiDriver::where('user_id', $request->user()->id)->first();
             if ($driver) {
                 $driver->status = 'offline';
                 $driver->save();
             }
 
-            // حذف رمز التوثيق الحالي
             $request->user()->currentAccessToken()->delete();
             
             return response()->json([
                 'status' => true,
-                'message' => 'تم تسجيل الخروج بنجاح'
+                'message' => 'logged out successfully'
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'حدث خطأ أثناء تسجيل الخروج',
+                'message' => 'error while logging out',
                 'error' => $e->getMessage()
             ], 500);
         }

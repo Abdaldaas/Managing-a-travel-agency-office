@@ -33,25 +33,19 @@ class TaxiDriver extends Model
         'total_trips' => 'integer'
     ];
 
-    /**
-     * Get the user that owns the taxi driver profile.
-     */
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the taxi requests for the driver.
-     */
+   
     public function taxiRequests(): HasMany
     {
         return $this->hasMany(TaxiRequest::class, 'driver_id');
     }
 
-    /**
-     * Get the active/current taxi request for the driver.
-     */
+   
     public function currentRequest(): BelongsTo
     {
         return $this->taxiRequests()
@@ -79,8 +73,8 @@ class TaxiDriver extends Model
             return null;
         }
 
-        // Using Haversine formula
-        $earthRadius = 6371; // Radius of the earth in km
+        
+        $earthRadius = 6371;
 
         $latFrom = deg2rad($this->current_latitude);
         $lonFrom = deg2rad($this->current_longitude);
@@ -96,35 +90,29 @@ class TaxiDriver extends Model
         return $angle * $earthRadius;
     }
 
-    /**
-     * Get all completed trips for this driver
-     */
+ 
     public function completedTrips(): HasMany
     {
         return $this->hasMany(TaxiRequest::class, 'driver_id')
                     ->where('status', 'completed');
     }
 
-    /**
-     * Get all trips for this driver
-     */
+   
     public function trips(): HasMany
     {
         return $this->hasMany(TaxiRequest::class, 'driver_id');
     }
 
-    /**
-     * Get all ratings for this driver through their completed trips
-     */
+   
     public function ratings(): HasManyThrough
     {
         return $this->hasManyThrough(
             Rating::class,
             TaxiRequest::class,
-            'driver_id', // Foreign key on taxi_requests table
-            'rateable_id', // Foreign key on ratings table
-            'id', // Local key on taxi_drivers table
-            'id' // Local key on taxi_requests table
+            'driver_id', 
+            'rateable_id', 
+            'id',
+            'id' 
         )->where('rateable_type', TaxiRequest::class);
     }
 

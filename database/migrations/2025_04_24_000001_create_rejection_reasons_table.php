@@ -12,7 +12,7 @@ return new class extends Migration
             Schema::create('rejection_reasons', function (Blueprint $table) {
                 $table->id();
                 $table->string('reason');
-                $table->enum('request_type', ['visa', 'passport', 'ticket', 'taxi', 'general'])->default('general');
+                $table->enum('request_type', ['visa', 'passport', 'ticket', 'taxi', 'general','haj'])->default('general');
                 $table->unsignedBigInteger('request_id')->nullable();
                 $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
                 $table->text('notes')->nullable();

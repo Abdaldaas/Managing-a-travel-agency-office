@@ -245,7 +245,7 @@ class UserController extends Controller {
         $visaBooking->status = 'pending';
         $visaBooking->save();
 
-        // Dispatch the event
+        
         event(new VisaRequested($visaBooking));
 
         return response()->json([

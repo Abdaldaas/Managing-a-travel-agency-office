@@ -15,9 +15,7 @@ class WeatherController extends Controller
             return response()->json(['error' => 'City parameter is required.'], 400);
         }
 
-        // You would typically use a weather API key here. Replace 'YOUR_WEATHER_API_KEY' with an actual key.
-        // For example, using OpenWeatherMap API: https://openweathermap.org/api
-        $apiKey = env('WEATHER_API_KEY'); // Store your API key in .env file
+        $apiKey = env('WEATHER_API_KEY');
         $apiUrl = "http://api.weatherapi.com/v1/current.json?key={$apiKey}&q={$city}";
 
         try {
