@@ -6,9 +6,15 @@ use App\Models\Haj;
 use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-
+use App\Services\NotificationService;
+use App\Models\User;
 class HajController extends Controller
 {
+     protected $notificationService;
+    public function __construct(NotificationService $notificationService)
+    {
+    $this->notificationService = $notificationService;
+    }
     public function addHajTrip(Request $request)
     {
         if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
@@ -43,7 +49,15 @@ class HajController extends Controller
             'takeoff_time' => $request->takeoff_time,
             'landing_time' => $request->landing_time
         ]);
-
+        $notificationService = new NotificationService();
+        $users = User::whereNotNull('fcm_token')->get();
+        
+        $title = 'New ' . ucfirst($hajTrip->package_type) . ' Trip Added';
+        $message = "A new " . $hajTrip->package_type . " trip has been added. Check out the details!";
+        
+        if ($users->count() > 0) {
+            $notificationService->sendToMany($title, $message, $users);
+        }
         return response()->json([
             'status' => true,
             'message' => 'Haj trip added successfully',
@@ -93,7 +107,15 @@ class HajController extends Controller
             'takeoff_time' => $request->takeoff_time,
             'landing_time' => $request->landing_time
         ]);
-
+        $notificationService = new NotificationService();
+        $users = User::whereNotNull('fcm_token')->get();
+        
+        $title = ucfirst($hajTrip->package_type) . ' Trip Updated';
+        $message = "The " . $hajTrip->package_type . " trip has been updated. Check out the latest changes!";
+        
+        if ($users->count() > 0) {
+            $notificationService->sendToMany($title, $message, $users);
+        }
         return response()->json([
             'status' => true,
             'message' => 'Haj trip updated successfully',

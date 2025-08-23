@@ -22,9 +22,75 @@ use App\Events\PassportRequested;
 use App\Events\VisaRequested;
 use App\Events\TicketRequested;
 use Illuminate\Notifications\DatabaseNotification;
-
+use App\Services\NotificationService;
 class UserController extends Controller {
-     public function requestPassport(Request $request)
+
+     protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+    $this->notificationService = $notificationService;
+    }
+   
+    public function registeruser(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|min:3|max:50',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:8',
+            'phone' => 'required|string|min:10',
+            'age' => 'required|integer|min:18',
+        ]);
+        if($validator->fails())
+        {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid data',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+        $user_check = User::where("email", "=", $request->email)->first();
+        if(isset($user_check->id))
+        {
+            return response()->json([
+                'status' => false,
+                'message'=> 'This email is already registered'
+            ], 400);        }
+        $user = new User();
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->password = Hash::make($request->password);
+        $user->age=$request->age;
+        $user->phone=$request->phone;
+        $user->role = "user";
+        $user->save(); 
+        $token = $user->createToken("auth_token")->plainTextToken;
+   
+        return response()->json(['user' => $user, 'message' => 'User registered successfully','token' => $token], 200);    }
+
+    public function login(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required'
+            ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,'message' => 'Invalid data', 'errors' => $validator->errors()], 400);
+            }
+        $user = User::where('email', $request->email)->first();
+        if (!$user) {
+            return response()->json(['status' => false,'message' => 'Email not registered'], 404);
+            }
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json(['status' => false,'message' => 'Invalid password'], 401);
+            }
+        $token = $user->createToken('auth_token')->plainTextToken;
+        return response()->json(['status' => true,'message' => 'Login successful',
+        'user' => $user,'token' => $token], 200);
+    }
+    public function requestPassport(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'passport_type' => 'required|in:regular,urgent,express',
@@ -129,7 +195,16 @@ class UserController extends Controller {
                 'status' => 'processing',
                 'price' => $passportRequest->price
             ]);
-
+            $notificationService = new NotificationService();
+            $admin = User::where('role', 'admin')->first(); 
+            
+            $user = auth()->user();
+            $title = 'New Passport Request';
+            $message = "A new passport request has been submitted by {$user->name}.";
+            
+            if ($admin) { 
+                $notificationService->sendToUser($title, $message, $admin);
+            }
             return response()->json([
                 'status' => true,
                 'message' => 'Passport request submitted successfully',
@@ -146,64 +221,7 @@ class UserController extends Controller {
             ], 500);
         }
     }
-    public function registeruser(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|min:3|max:50',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:8',
-            'phone' => 'required|string|min:10',
-            'age' => 'required|integer|min:18',
-        ]);
-        if($validator->fails())
-        {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid data',
-                'errors' => $validator->errors()
-            ], 400);
-        }
-        $user_check = User::where("email", "=", $request->email)->first();
-        if(isset($user_check->id))
-        {
-            return response()->json([
-                'status' => false,
-                'message'=> 'This email is already registered'
-            ], 400);        }
-        $user = new User();
-        $user->name = $request->name;
-        $user->email = $request->email;
-        $user->password = Hash::make($request->password);
-        $user->age=$request->age;
-        $user->phone=$request->phone;
-        $user->role = "user";
-        $user->save(); 
-        $token = $user->createToken("auth_token")->plainTextToken;
-   
-        return response()->json(['user' => $user, 'message' => 'User registered successfully','token' => $token], 200);    }
 
-    public function login(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required'
-            ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,'message' => 'Invalid data', 'errors' => $validator->errors()], 400);
-            }
-        $user = User::where('email', $request->email)->first();
-        if (!$user) {
-            return response()->json(['status' => false,'message' => 'Email not registered'], 404);
-            }
-        if (!Hash::check($request->password, $user->password)) {
-            return response()->json(['status' => false,'message' => 'Invalid password'], 401);
-            }
-        $token = $user->createToken('auth_token')->plainTextToken;
-        return response()->json(['status' => true,'message' => 'Login successful',
-        'user' => $user,'token' => $token], 200);
-    }
     public function requestVisa(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -246,7 +264,16 @@ class UserController extends Controller {
         $visaBooking->save();
 
         
-        event(new VisaRequested($visaBooking));
+        $notificationService = new NotificationService();
+    $admin = User::where('role', 'admin')->first(); 
+    
+    $user = auth()->user();
+    $title = 'New Visa Request';
+    $message = "A new visa request to {$visa->country} has been submitted by {$user->name}.";
+    
+    if ($admin) { 
+        $notificationService->sendToUser($title, $message, $admin);
+    }
 
         return response()->json([
             'status' => true,
@@ -291,8 +318,16 @@ class UserController extends Controller {
         $ticketRequest->status = 'pending';
         $ticketRequest->save();
 
-        // Dispatch the event
-        event(new TicketRequested($ticketRequest));
+        $notificationService = new NotificationService();
+        $admin = User::where('role', 'admin')->first(); 
+        
+        $user = auth()->user();
+        $title = 'New Ticket Request';
+        $message = "A new ticket request has been submitted by {$user->name}.";
+        
+        if ($admin) { 
+            $notificationService->sendToUser($title, $message, $admin);
+        }
 
         return response()->json([
             'status' => true,
@@ -351,7 +386,16 @@ class UserController extends Controller {
         $hajBooking->health_report_file = $healthReportPath;
         $hajBooking->vaccination_certificate = $vaccinationPath;
         $hajBooking->save();
-
+        $notificationService = new NotificationService();
+        $admin = User::where('role', 'admin')->first(); 
+        
+        $user = auth()->user();
+        $title = 'New Haj/Umrah Request';
+        $message = "A new {$haj->package_type} request has been submitted by {$user->name}.";
+        
+        if ($admin) { 
+            $notificationService->sendToUser($title, $message, $admin);
+        }
         return response()->json([
             'status' => true,
             'message' => 'Haj booking request submitted successfully',
@@ -362,7 +406,7 @@ class UserController extends Controller {
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $request->user()->tokens()->delete();
         return response()->json(['status' => true, 'message' => 'Logged out successfully'], 200);
     }
 

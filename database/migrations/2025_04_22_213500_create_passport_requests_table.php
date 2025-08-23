@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('passport_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['processing', 'pending_payment', 'completed', 'rejected']);
-            $table->enum('passport_type', ['regular', 'urgent']);
+            $table->enum('passport_type', ['regular', 'urgent','express']);
             $table->decimal('price', 8, 2);
             $table->boolean('is_paid')->default(false);
             $table->timestamps();

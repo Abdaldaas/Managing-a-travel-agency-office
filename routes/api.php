@@ -30,6 +30,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/haj/request', [UserController::class, 'requestHaj']);
     Route::get('/requests/status', [UserController::class, 'getRequestsStatus']);
     
+    //
+    Route::get('/haj', [HajController::class, 'getAllHajTrips']);
+    Route::get('/flight', action:  [FlightController::class, 'getAllFlights']);
+    Route::get('/visa/showall', [VisaController::class, 'getAllVisas']);
     // User Notifications
     Route::get('/notifications', [UserController::class, 'getNotifications']);
     Route::patch('/notifications/{id}/mark-as-read', [UserController::class, 'markNotificationAsRead']);

@@ -27,7 +27,8 @@ class User extends Authenticatable
         'password',
         'phone',
         'age',
-        'role'
+        'role',
+        'fcm_token'
     ];
 
     protected $hidden = [
@@ -40,9 +41,7 @@ class User extends Authenticatable
         'age' => 'integer',
     ];
 
-    /**
-     * Get the visa applications for the user.
-     */
+   
     public function visas(): HasMany
     {
         return $this->hasMany(Visa::class);
@@ -80,25 +79,18 @@ class User extends Authenticatable
     {
         return $this->hasMany(PassportRequest::class);
     }
-    /**
-     * Get the taxi driver profile associated with the user.
-     */
+    
     public function taxiDriver(): HasOne
     {
         return $this->hasOne(TaxiDriver::class);
     }
 
-    /**
-     * Get the taxi requests made by the user.
-     */
+    
     public function taxiRequests(): HasMany
     {
         return $this->hasMany(TaxiRequest::class);
     }
 
-    /**
-     * Check if the user is a taxi driver
-     */
     public function isTaxiDriver(): bool
     {
         return $this->role === 'driver';

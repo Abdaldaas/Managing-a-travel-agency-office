@@ -18,11 +18,19 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
-use App\Events\PassportStatusUpdated;
 use App\Events\VisaStatusUpdated;
 use App\Events\TicketStatusUpdated;
+use App\Services\NotificationService;
+
 
 class AdminController extends Controller {
+    
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+    $this->notificationService = $notificationService;
+    }
     public function adminLogin(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -98,7 +106,7 @@ class AdminController extends Controller {
             ], 403);
         }
 
-        $user = User::with(['passports', 'visas', 'hajRequests', 'ticketRequests'])
+        $user = User::with(['passportrequests', 'visasrequests', 'hajRequests', 'ticketRequests'])
             ->findOrFail($id);
 
         return response()->json([
@@ -167,10 +175,7 @@ public function handleTicketRequest(Request $request)
     $ticketRequest->status = $request->status;
     $ticketRequest->save();
 
-    // Dispatch the event
-    event(new TicketStatusUpdated($ticketRequest, $oldStatus, $request->status));
-
-    // Update the corresponding booking status
+  
     $booking = Booking::where('user_id', $ticketRequest->user_id)
         ->where('type', 'ticket')->where('status', 'pending')->first();
 
@@ -188,15 +193,23 @@ public function handleTicketRequest(Request $request)
         ]);
         $rejectionReason->save();
 
-        // Create notification for rejection
-        // Notification::create([
-        //     'user_id' => $ticketRequest->user_id,
-        //     'title' => 'Ticket Request Rejected',
-        //     'message' => 'Your ticket request has been rejected. Reason: ' . $request->rejection_reason,
-        //     'type' => 'ticket_request'
-        // ]);
     }
-
+    $notificationService = new NotificationService();
+    $title = '';
+    $message = '';
+    $user = $ticketRequest->user;
+    
+    if ($request->status === 'rejected') {
+        $title = 'Ticket Request Rejected';
+        $message = 'We’re sorry, your ticket request has been rejected. Reason: ' . $request->rejection_reason;
+    } elseif ($request->status === 'approved') {
+        $title = 'Ticket Request Approved';
+        $message = 'Your ticket request has been approved. Please review the details.';
+    }
+    
+    if (!empty($title) && !empty($message) && $user) {
+        $notificationService->sendToUser($title, $message, $user);
+    }
     return response()->json([
         'status' => true,
         'message' => 'Ticket request ' . $request->status . ' successfully',
@@ -247,9 +260,6 @@ public function updateVisaBooking(Request $request)
     $visaBooking->status = $request->status; 
     $visaBooking->save();
 
-    // Dispatch the event
-    event(new VisaStatusUpdated($visaBooking, $oldStatus, $request->status));
-
     $booking = Booking::where('user_id', $visaBooking->user_id)
     ->where('type', 'ticket')->where('status', 'pending')->first();
 
@@ -267,11 +277,26 @@ public function updateVisaBooking(Request $request)
             'user_id' => $visaBooking->user_id
         ]);
         $rejectionReason->save();
-        return response()->json([
-            'status' => true,
-            'message' => 'Visa booking status updated successfully',
-            'visa_booking' => $visaBooking
-        ]);}
+        $notificationService = new NotificationService();
+    $title = '';
+    $message = '';
+    
+   
+    $user = $visaBooking->user;
+
+    if ($request->status === 'rejected') {
+        $title = 'Visa Application Rejected';
+        $message = 'We’re sorry, your visa application has been rejected. Reason: ' . $request->rejection_reason;
+    } elseif ($request->status === 'approved') {
+        $title = 'Visa Application Approved';
+        $message = 'Your visa application has been approved. Please check the details and complete any pending steps.';
+    }
+    
+    if (!empty($title) && !empty($message) && $user) {
+        $notificationService->sendToUser($title, $message, $user);
+    }
+        return response()->json(['status' => true,'message' => 'Visa booking status updated successfully',
+            'visa_booking' => $visaBooking]);}
     }
 
 public function handleHajBookingRequest(Request $request)
@@ -315,7 +340,7 @@ public function handleHajBookingRequest(Request $request)
     $hajBooking->status = $request->status;
     $hajBooking->save();
 
-    // Update the corresponding booking status
+   
     $booking = Booking::where('user_id', $hajBooking->user_id)
         ->where('type', 'haj')
         ->where('status', 'pending')
@@ -335,7 +360,24 @@ public function handleHajBookingRequest(Request $request)
         ]);
         $rejectionReason->save();
     }
+    $notificationService = new NotificationService();
+    $title = '';
+    $message = '';
+    
+    
+    $user = $hajBooking->user;
 
+    if ($request->status === 'rejected') {
+        $title = 'Hajj Booking Rejected';
+        $message = 'We’re sorry, your Hajj booking request has been rejected. Reason: ' . $request->rejection_reason;
+    } elseif ($request->status === 'approved') {
+        $title = 'Hajj Booking Approved';
+        $message = 'Your Hajj booking request has been approved. Please review the booking details.';
+    }
+    
+    if (!empty($title) && !empty($message) && $user) {
+        $notificationService->sendToUser($title, $message, $user);
+    }
     return response()->json([
         'status' => true,
         'message' => 'Haj booking request processed successfully',
@@ -439,7 +481,7 @@ public function handlePassportRequest(Request $request)
 
     $validator = Validator::make($request->all(), [
         'passport_request_id' => 'required|exists:passport_requests,id',
-        'status' => 'required|in:approved,rejected',
+        'status' => 'required|in:pending_payment,rejected',
         'rejection_reason' => 'required_if:status,rejected|string'
     ]);
 
@@ -463,9 +505,7 @@ public function handlePassportRequest(Request $request)
     $passportRequest->status = $request->status;
     $passportRequest->save();
 
-    // Dispatch the event
-    event(new PassportStatusUpdated($passportRequest, $oldStatus, $request->status));
-
+   
     if ($request->status === 'rejected' && $request->rejection_reason) {
         $rejectionReason = new RejectionReason([
             'reason' => $request->rejection_reason,
@@ -476,6 +516,23 @@ public function handlePassportRequest(Request $request)
         $rejectionReason->save();
     }
 
+    $user = $passportRequest->user;
+    $notificationService = new NotificationService();
+    $title = '';
+    $message = '';
+    
+    if ($request->status === 'rejected') {
+        $title = 'Passport Application Rejected';
+        $message = 'We’re sorry, your passport application has been rejected. Reason: ' . $request->rejection_reason;
+    } elseif ($request->status === 'pending_payment') {
+        $title = 'Passport Application Approved';
+        $message = 'Your passport application has been approved. Please proceed with the payment.';
+    }
+    
+    if (!empty($title) && !empty($message)) {
+        $notificationService->sendToUser($title, $message, $user);
+    }
+  
     return response()->json([
         'status' => true,
         'message' => 'Passport request ' . $request->status . ' successfully',
@@ -513,6 +570,23 @@ public function updateBookingStatus(Request $request, $id)
         }
         
         $booking->save();
+        $notificationService = new NotificationService();
+        $user = $booking->user;
+        $bookingType = ucfirst($booking->type); 
+        $title = '';
+        $message = '';
+        
+        if ($request->status === 'rejected') {
+            $title = $bookingType . ' Booking Rejected';
+            $message = "We’re sorry, your {$bookingType} booking has been rejected. Reason: " . $request->rejection_reason;
+        } elseif ($request->status === 'approved') {
+            $title = $bookingType . ' Booking Approved';
+            $message = "Your {$bookingType} booking has been approved. Please review the details.";
+        }
+        
+        if (!empty($title) && !empty($message) && $user) {
+            $notificationService->sendToUser($title, $message, $user);
+        }
         return response()->json([
             'status' => 'success',
             'message' => 'Booking status updated successfully',

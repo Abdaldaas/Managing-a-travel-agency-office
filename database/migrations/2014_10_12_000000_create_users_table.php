@@ -15,6 +15,7 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+              $table->text('fcm_token')->nullable();
             $table->string('name', 120);
             $table->string('email', 50)->unique();
             $table->string('password', 70);

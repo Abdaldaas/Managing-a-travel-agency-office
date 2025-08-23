@@ -7,9 +7,17 @@ use App\Models\Airport;
 use App\Models\TicketRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Services\NotificationService;
+use App\Models\User;
 
 class FlightController extends Controller
 {
+     protected $notificationService;
+   public function __construct(NotificationService $notificationService)
+    {
+    $this->notificationService = $notificationService;
+    }
+
     public function addFlight(Request $request)
     {
         if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
@@ -49,9 +57,19 @@ class FlightController extends Controller
             'status' => $request->status ?? 'scheduled'
         ]);
 
-        // Load airport relationships
+    
         $flight->load(['departureAirport', 'arrivalAirport']);
 
+        $notificationService = new NotificationService();
+
+        $users = User::whereNotNull('fcm_token')->get();
+
+        $title = 'New Flight Added';
+        $message = "A new flight has been added: Flight {$flight->flight_number} from {$flight->departureAirport->name} to {$flight->arrivalAirport->name}.";
+        
+        if ($users->count() > 0) {
+            $notificationService->sendToMany($title, $message, $users);
+        }
         return response()->json([
             'status' => true,
             'message' => 'Flight added successfully',
@@ -106,9 +124,16 @@ class FlightController extends Controller
             'status' => $request->status ?? $flight->status
         ]);
 
-        // Load airport relationships
-        $flight->load(['departureAirport', 'arrivalAirport']);
 
+        $flight->load(['departureAirport', 'arrivalAirport']);
+        $notificationService = new NotificationService();
+        $users = User::whereNotNull('fcm_token')->get();
+        $title = 'Flight Status Update';
+        $message = "Flight {$flight->flight_number} status has been updated to {$flight->status}.";
+        
+        if ($users->count() > 0) {
+            $notificationService->sendToMany($title, $message, $users);
+        }
         return response()->json([
             'status' => true,
             'message' => 'Flight updated successfully',
@@ -133,7 +158,7 @@ class FlightController extends Controller
             ], 404);
         }
 
-        // Check if there are any ticket requests for this flight
+ 
         $hasTicketRequests = TicketRequest::where('flight_id', $id)->exists();
         if ($hasTicketRequests) {
             return response()->json([
@@ -183,8 +208,8 @@ class FlightController extends Controller
     public function searchFlights(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'departure' => 'required|string|size:3', // IATA code
-            'arrival' => 'required|string|size:3',   // IATA code
+            'departure' => 'required|string|size:3', 
+            'arrival' => 'required|string|size:3',   
             'date' => 'required|date|after_or_equal:today'
         ]);
 

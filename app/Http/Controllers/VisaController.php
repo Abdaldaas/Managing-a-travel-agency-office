@@ -5,12 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\Visa;
 use App\Models\Booking;
 use App\Models\RejectionReason;
-use App\model\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Services\NotificationService;
+use App\Models\User;
 
 class VisaController extends Controller
 {
+     protected $notificationService;
+    public function __construct(NotificationService $notificationService)
+    {
+    $this->notificationService = $notificationService;
+    }
+
     public function addVisa(Request $request)
     {
         if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
@@ -41,7 +48,15 @@ class VisaController extends Controller
             'visa_type' => $request->visa_type,
             'Total_cost' => $request->Total_cost
         ]);
-
+        $notificationService = new NotificationService();
+        $users = User::whereNotNull('fcm_token')->get();
+    
+        $title = 'New Visa Offer Available!';
+        $message = "A new visa offer to {$visa->country} has been added. Check it out!";
+    
+        if ($users->count() > 0) {
+            $notificationService->sendToMany($title, $message, $users);
+        }
         return response()->json([
             'status' => true,
             'message' => 'Visa added successfully',
@@ -97,7 +112,15 @@ class VisaController extends Controller
                 'message' => 'Cannot update visa with existing bookings'
             ], 400);
         }
-
+        $notificationService = new NotificationService();
+        $users = User::whereNotNull('fcm_token')->get();
+        
+        $title = 'Visa Offer Updated';
+        $message = "The visa offer for {$visa->country} has been updated. Check the latest details!";
+        
+        if ($users->count() > 0) {
+            $notificationService->sendToMany($title, $message, $users);
+        }
         return response()->json([
             'status' => true,
             'message' => 'Visa updated successfully',

@@ -28,13 +28,21 @@ class DatabaseSeeder extends Seeder
 
         // Create admin user
         User::create([
-            'name' => 'Admin',
-            'email' => 'admin@gmail.com',
+            'name'     => 'Admin',
+            'email'    => 'admin@gmail.com',
             'password' => Hash::make('12345678'),
-            'phone'=>'+1234567890',
-            'age'   => '30',
-            'role' => 'admin',
+            'phone'    => '+1234567890',
+            'age'      => 30,
+            'role'     => 'admin',
+            'fcm_token'=> 'test_admin_token_'.uniqid(),
         ]);
+
+        // Create a few regular users with fake fcm_tokens
+        User::factory()->count(5)->create()->each(function ($user) {
+            $user->update([
+                'fcm_token' => 'test_user_token_'.uniqid(),
+            ]);
+        });
 
         // Create countries if they don't exist
         if (Country::count() === 0) {
