@@ -17,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
-
 use App\Events\VisaStatusUpdated;
 use App\Events\TicketStatusUpdated;
 use App\Services\NotificationService;
@@ -185,6 +184,21 @@ public function handleTicketRequest(Request $request)
     }
 
     if ($request->status === 'rejected' && $request->rejection_reason) {
+        if ($booking && $booking->stripe_payment_intent_id) {
+            try {
+                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+                \Stripe\Refund::create([
+                    'payment_intent' => $booking->stripe_payment_intent_id,
+                ]);
+                $booking->status = 'refunded';
+                $booking->save();
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Ticket request rejected, but refund failed: ' . $e->getMessage()
+                ], 500);
+            }
+        }
         $rejectionReason = new RejectionReason([
             'reason' => $request->rejection_reason,
             'request_type' => 'ticket',
@@ -200,9 +214,11 @@ public function handleTicketRequest(Request $request)
     $user = $ticketRequest->user;
     
     if ($request->status === 'rejected') {
+        
         $title = 'Ticket Request Rejected';
         $message = 'We’re sorry, your ticket request has been rejected. Reason: ' . $request->rejection_reason;
-    } elseif ($request->status === 'approved') {
+    }
+     elseif ($request->status === 'approved') {
         $title = 'Ticket Request Approved';
         $message = 'Your ticket request has been approved. Please review the details.';
     }
@@ -261,7 +277,7 @@ public function updateVisaBooking(Request $request)
     $visaBooking->save();
 
     $booking = Booking::where('user_id', $visaBooking->user_id)
-    ->where('type', 'ticket')->where('status', 'pending')->first();
+    ->where('type', 'visa')->where('status', 'pending')->first();
 
      if ($booking) {
         $booking->status = $request->status;
@@ -270,6 +286,22 @@ public function updateVisaBooking(Request $request)
    
 
     if ($request->status === 'rejected' && $request->rejection_reason) {
+      
+            try {
+                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+                \Stripe\Refund::create([
+                    'payment_intent' => $booking->stripe_payment_intent_id,
+                ]);
+           
+                $booking->status = 'refunded';
+                $booking->save();
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Visa booking request rejected, but refund failed: ' . $e->getMessage()
+                ], 500);
+            }
+
         $rejectionReason = new RejectionReason([
             'reason' => $request->rejection_reason,
             'request_type' => 'Visa',
@@ -277,11 +309,12 @@ public function updateVisaBooking(Request $request)
             'user_id' => $visaBooking->user_id
         ]);
         $rejectionReason->save();
-        $notificationService = new NotificationService();
+    }
+    
+    $notificationService = new NotificationService();
     $title = '';
     $message = '';
     
-   
     $user = $visaBooking->user;
 
     if ($request->status === 'rejected') {
@@ -295,9 +328,9 @@ public function updateVisaBooking(Request $request)
     if (!empty($title) && !empty($message) && $user) {
         $notificationService->sendToUser($title, $message, $user);
     }
-        return response()->json(['status' => true,'message' => 'Visa booking status updated successfully',
-            'visa_booking' => $visaBooking]);}
-    }
+    return response()->json(['status' => true,'message' => 'Visa booking status updated successfully',
+        'visa_booking' => $visaBooking]);
+}
 
 public function handleHajBookingRequest(Request $request)
 {
@@ -352,6 +385,19 @@ public function handleHajBookingRequest(Request $request)
     }
 
     if ($request->status === 'rejected' && $request->rejection_reason) {
+        try {
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+            \Stripe\Refund::create([
+                'payment_intent' => $booking->stripe_payment_intent_id,
+            ]);
+            $booking->status = 'refunded';
+            $booking->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Haj booking request rejected, but refund failed: ' . $e->getMessage()
+            ], 500);
+        }
         $rejectionReason = new RejectionReason([
             'reason' => $request->rejection_reason,
             'request_type' => 'haj',
@@ -370,7 +416,8 @@ public function handleHajBookingRequest(Request $request)
     if ($request->status === 'rejected') {
         $title = 'Hajj Booking Rejected';
         $message = 'We’re sorry, your Hajj booking request has been rejected. Reason: ' . $request->rejection_reason;
-    } elseif ($request->status === 'approved') {
+    } 
+    elseif ($request->status === 'approved') {
         $title = 'Hajj Booking Approved';
         $message = 'Your Hajj booking request has been approved. Please review the booking details.';
     }
@@ -507,6 +554,27 @@ public function handlePassportRequest(Request $request)
 
    
     if ($request->status === 'rejected' && $request->rejection_reason) {
+        $booking = Booking::where('user_id', $passportRequest->user_id)
+        ->where('type', 'passport')
+        ->where('status', 'paid') // تأكد من أن الدفع تم
+        ->first();
+
+    if ($booking && $booking->stripe_payment_intent_id) {
+        try {
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+            \Stripe\Refund::create([
+                'payment_intent' => $booking->stripe_payment_intent_id,
+            ]);
+            $booking->status = 'refunded';
+            $booking->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Passport request rejected, but refund failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
         $rejectionReason = new RejectionReason([
             'reason' => $request->rejection_reason,
             'request_type' => 'passport',
@@ -560,6 +628,21 @@ public function updateBookingStatus(Request $request, $id)
         $booking->status = $request->status;
         
         if ($request->status === 'rejected' && $request->has('rejection_reason')) {
+            if ($booking->stripe_payment_intent_id) {
+                try {
+                    \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+                    \Stripe\Refund::create([
+                        'payment_intent' => $booking->stripe_payment_intent_id,
+                    ]);
+                    $booking->status = 'refunded';
+                    $booking->save();
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Booking request rejected, but refund failed: ' . $e->getMessage()
+                    ], 500);
+                }
+            }
             $rejectionReason = new RejectionReason([
                 'reason' => $request->rejection_reason,
                 'request_type' => $booking->type,
@@ -579,7 +662,8 @@ public function updateBookingStatus(Request $request, $id)
         if ($request->status === 'rejected') {
             $title = $bookingType . ' Booking Rejected';
             $message = "We’re sorry, your {$bookingType} booking has been rejected. Reason: " . $request->rejection_reason;
-        } elseif ($request->status === 'approved') {
+        } 
+        elseif ($request->status === 'approved') {
             $title = $bookingType . ' Booking Approved';
             $message = "Your {$bookingType} booking has been approved. Please review the details.";
         }

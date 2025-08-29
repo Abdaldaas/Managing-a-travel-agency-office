@@ -23,6 +23,12 @@ use App\Events\VisaRequested;
 use App\Events\TicketRequested;
 use Illuminate\Notifications\DatabaseNotification;
 use App\Services\NotificationService;
+
+use Stripe\Stripe;
+use Stripe\Checkout\Session;
+use Illuminate\Support\Facades\DB;
+
+
 class UserController extends Controller {
 
      protected $notificationService;
@@ -181,160 +187,174 @@ class UserController extends Controller {
             $passportRequest->user_id = auth()->id();
             $passportRequest->passport_id = $passport->id;
             $passportRequest->passport_type = $request->passport_type;
-            $passportRequest->status = 'processing';
+            $passportRequest->status = 'pending_payment';
             $passportRequest->calculatePrice();
             $passportRequest->save();
+ 
+            Stripe::setApiKey(config('services.stripe.secret'));
 
-            // Dispatch the event
-            event(new PassportRequested($passportRequest));
-
-            $booking = Booking::create([
-                'user_id' => auth()->id(),
-                'user_name' => auth()->user()->name,
-                'type' => 'passport',
-                'status' => 'processing',
-                'price' => $passportRequest->price
+            $checkout_session = \Stripe\Checkout\Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'unit_amount' => $passportRequest->price * 100,
+                        'product_data' => [
+                            'name' => 'Passport Application',
+                            'description' => "Type: " . ucfirst($request->passport_type),
+                        ],
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('payment.cancel'),
+                'metadata' => [
+                    'booking_type' => 'passport',
+                    'user_id' => auth()->id(),
+                    'passport_request_id' => $passportRequest->id,
+                     
+                ]
             ]);
-            $notificationService = new NotificationService();
-            $admin = User::where('role', 'admin')->first(); 
-            
-            $user = auth()->user();
-            $title = 'New Passport Request';
-            $message = "A new passport request has been submitted by {$user->name}.";
-            
-            if ($admin) { 
-                $notificationService->sendToUser($title, $message, $admin);
-            }
             return response()->json([
                 'status' => true,
-                'message' => 'Passport request submitted successfully',
-                'passport' => $passport,
-                'passport_request' => $passportRequest,
-                'booking' => $booking
-            ], 201);
-
+                'message' => 'Redirecting to payment gateway',
+                'url' => $checkout_session->url
+            ], 200);
+    
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Error processing passport request',
-                'error' => $e->getMessage()
-            ], 500);
+            return response()->json(['status' => false, 'message' => 'Error processing passport request: ' . $e->getMessage()], 500);
         }
     }
 
     public function requestVisa(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'visa_id' => 'required|exists:visa,id',
-            'passport_file' => 'required|file',
-            'photo_file' => 'required|file'
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'visa_id' => 'required|exists:visa,id', 
+        'passport_file' => 'required|file',
+        'photo_file' => 'required|file'
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid data',
-                'errors' => $validator->errors()
-            ], 400);
-        }
+    if ($validator->fails()) {
+        return response()->json(['status' => false, 'message' => 'Invalid data', 'errors' => $validator->errors()], 400);
+    }
 
-        $visa = Visa::find($request->visa_id);
-        if (!$visa) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Visa not found'
-            ], 404);
-        }
+    $visa = Visa::where('id',$request->visa_id)->first();
+    if (!$visa) {
+        return response()->json(['status' => false, 'message' => 'Visa not found'], 404);
+    }
 
+    try {
+ 
         $passportPath = $request->file('passport_file')->store('passports');
         $photoPath = $request->file('photo_file')->store('photos');
-        $booking = Booking::create([
+        
+       
+        $visaBooking = VisaBooking::create([
             'user_id' => auth()->id(),
             'user_name' => auth()->user()->name,
-            'type' => 'visa',
+            'visa_id' => $visa->id,
+            'PhotoFile' => $photoPath,
+            'PassportFile' => $passportPath,
             'status' => 'pending',
-            'price' => $visa->Total_cost
         ]);
-        $visaBooking = new VisaBooking();
-        $visaBooking->user_id = auth()->id();
-        $visaBooking->user_name = auth()->user()->name;
-        $visaBooking->PhotoFile = $photoPath;
-        $visaBooking->PassportFile = $passportPath;
-        $visaBooking->status = 'pending';
-        $visaBooking->save();
 
-        
-        $notificationService = new NotificationService();
-    $admin = User::where('role', 'admin')->first(); 
-    
-    $user = auth()->user();
-    $title = 'New Visa Request';
-    $message = "A new visa request to {$visa->country} has been submitted by {$user->name}.";
-    
-    if ($admin) { 
-        $notificationService->sendToUser($title, $message, $admin);
-    }
+ 
+        Stripe::setApiKey(config('services.stripe.secret'));
+
+        $checkout_session = \Stripe\Checkout\Session::create([
+            'payment_method_types' => ['card'],
+            'line_items' => [[
+                'price_data' => [
+                    'currency' => 'usd',
+                    'unit_amount' => $visa->Total_cost * 100, 
+                    'product_data' => [
+                        'name' => 'Visa Application',
+                        'description' => "Visa for " . $visa->country,
+                    ],
+                ],
+                'quantity' => 1,
+            ]],
+            'mode' => 'payment',
+            'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => route('payment.cancel'),
+            'metadata' => [
+                'booking_type' => 'visa',
+                'user_id' => auth()->id(),
+                'visa_id' => $visa->id,
+                'visa_booking_id' => $visaBooking->id 
+            ]
+        ]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Visa booking request submitted successfully',
-            'booking' => $booking,
-            'visa_booking' => $visaBooking
-        ], 201);
-    }
+            'message' => 'Redirecting to payment gateway',
+            'url' => $checkout_session->url
+        ], 200);
 
-    public function requestTicket(Request $request)
+    } catch (\Exception $e) {
+        return response()->json(['status' => false, 'message' => 'Payment processing failed: ' . $e->getMessage()], 500);
+    }
+}
+
+public function requestTicket(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'flight_id' => 'required|exists:flights,id',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid data',
-                'errors' => $validator->errors()
-            ], 400);
+            return response()->json(['status' => false, 'message' => 'Invalid data', 'errors' => $validator->errors()], 400);
         }
-        
+
         $flight = Flight::find($request->flight_id);
         if (!$flight) {
+            return response()->json(['status' => false, 'message' => 'Flight not found'], 404);
+        }
+
+        try {
+            $ticketRequest = TicketRequest::create([
+                'user_id' => auth()->id(),
+                'flight_id' => $request->flight_id,
+                'total_price' => $flight->price,
+                'status' => 'pending',
+            ]);
+
+            Stripe::setApiKey(config('services.stripe.secret'));
+
+            $checkout_session = \Stripe\Checkout\Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'unit_amount' => $flight->price * 100,
+                        'product_data' => [
+                            'name' => 'Flight Ticket Booking',
+                            'description' => "Flight from {$flight->departure_airport} to {$flight->arrival_airport}",
+                        ],
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('payment.cancel'),
+                'metadata' => [
+                    'booking_type' => 'ticket',
+                    'user_id' => auth()->id(),
+                    'flight_id' => $flight->id,
+                    'ticket_request_id' => $ticketRequest->id
+                ]
+            ]);
+
             return response()->json([
-                'status' => false,
-                'message' => 'Flight not found'
-            ], 404);
-        }
-        $booking = Booking::create([
-            'user_id' => auth()->id(),
-            'user_name' => auth()->user()->name,
-            'type' => 'ticket',
-            'status' => 'pending',
-            'price' => $flight->price
-        ]);
-        $ticketRequest = new TicketRequest();
-        $ticketRequest->user_id = auth()->id();
-        $ticketRequest->flight_id = $request->flight_id;
-        $ticketRequest->total_price = $flight->price;
-        $ticketRequest->status = 'pending';
-        $ticketRequest->save();
+                'status' => true,
+                'message' => 'Redirecting to payment gateway',
+                'url' => $checkout_session->url
+            ], 200);
 
-        $notificationService = new NotificationService();
-        $admin = User::where('role', 'admin')->first(); 
-        
-        $user = auth()->user();
-        $title = 'New Ticket Request';
-        $message = "A new ticket request has been submitted by {$user->name}.";
-        
-        if ($admin) { 
-            $notificationService->sendToUser($title, $message, $admin);
+        } catch (\Exception $e) {
+            return response()->json(['status' => false, 'message' => 'Payment processing failed: ' . $e->getMessage()], 500);
         }
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Ticket request submitted successfully',
-            'ticket_request' => $ticketRequest,
-            'booking' => $booking
-        ], 201);
     }
 
     public function requestHaj(Request $request)
@@ -363,45 +383,249 @@ class UserController extends Controller {
             ], 404);
         }
 
-        
-        $booking = Booking::create([
-            'user_id' => auth()->id(),
-            'user_name' => auth()->user()->name,
-            'type' => 'haj',
-            'status' => 'pending',
-            'price' => $haj->total_price
-        ]);
+        try {
+            $passportPath = $request->file('passport_file')->store('passports');
+            $photoPath = $request->file('photo_file')->store('photos');
+            $healthReportPath = $request->file('health_report_file')->store('health_reports');
+            $vaccinationPath = $request->file('vaccination_certificate')->store('vaccination_certificates');
 
-        $passportPath = $request->file('passport_file')->store('passports');
-        $photoPath = $request->file('photo_file')->store('photos');
-        $healthReportPath = $request->file('health_report_file')->store('health_reports');
-        $vaccinationPath = $request->file('vaccination_certificate')->store('vaccination_certificates');
+            $hajBooking = HajBooking::create([
+                'user_id' => auth()->id(),
+                'haj_id' => $request->haj_id,
+                'status' => 'pending', 
+                'passport_file' => $passportPath,
+                'photo_file' => $photoPath,
+                'health_report_file' => $healthReportPath,
+                'vaccination_certificate' => $vaccinationPath
+            ]);
+            
+            Stripe::setApiKey(config('services.stripe.secret'));
 
-        $hajBooking = new HajBooking();
-        $hajBooking->user_id = auth()->id();
-        $hajBooking->haj_id = $request->haj_id;
-        $hajBooking->status = 'pending';
-        $hajBooking->passport_file = $passportPath;
-        $hajBooking->photo_file = $photoPath;
-        $hajBooking->health_report_file = $healthReportPath;
-        $hajBooking->vaccination_certificate = $vaccinationPath;
-        $hajBooking->save();
-        $notificationService = new NotificationService();
-        $admin = User::where('role', 'admin')->first(); 
-        
-        $user = auth()->user();
-        $title = 'New Haj/Umrah Request';
-        $message = "A new {$haj->package_type} request has been submitted by {$user->name}.";
-        
-        if ($admin) { 
-            $notificationService->sendToUser($title, $message, $admin);
+         
+            $checkout_session = \Stripe\Checkout\Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'unit_amount' => $haj->total_price * 100, 
+                        'product_data' => [
+                            'name' => 'Haj Package Booking',
+                            'description' => $haj->package_type,
+                        ],
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('payment.cancel'),
+                'metadata' => [
+                    'booking_type' => 'haj',
+                    'user_id' => auth()->id(),
+                    'haj_id' => $request->haj_id,
+                    'haj_booking_id' => $hajBooking->id
+                ]
+            ]);
+
+           
+            return response()->json([
+                'status' => true,
+                'message' => 'Redirecting to payment gateway',
+                'url' => $checkout_session->url
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Payment processing failed: ' . $e->getMessage()
+            ], 500);
         }
+    }
+
+   
+    public function handlePaymentSuccess(Request $request)
+    {
+        Stripe::setApiKey(config('services.stripe.secret'));
+        $sessionId = $request->get('session_id');
+
+        if (!$sessionId) {
+            return response()->json(['status' => false, 'message' => 'Session ID not found.'], 400);
+        }
+    
+        try {
+            $session = Session::retrieve($sessionId, ['expand' => ['payment_intent']]);
+            $paymentIntentId = null;
+            if (isset($session->payment_intent)) {
+                if (is_object($session->payment_intent) && isset($session->payment_intent->id)) {
+                    $paymentIntentId = $session->payment_intent->id;
+                } elseif (is_string($session->payment_intent)) {
+                    $paymentIntentId = $session->payment_intent;
+                }
+            }
+            
+            if (!$session || $session->payment_status !== 'paid') {
+                return response()->json(['status' => false, 'message' => 'Payment was not successful.'], 400);
+            }
+    
+            if (!$session->metadata) {
+                return response()->json(['status' => false, 'message' => 'Stripe session metadata is missing.'], 400);
+            }
+    
+            $metadata = (object) $session->metadata->toArray();
+            $bookingType = $metadata->booking_type ?? null;
+            $userId = $metadata->user_id ?? null;
+        
+            if (!$bookingType || !$userId) {
+                return response()->json(['status' => false, 'message' => 'Missing required metadata.'], 400);
+            }
+    
+            $user = User::find($userId);
+            if (!$user) {
+                return response()->json(['status' => false, 'message' => 'User not found.'], 404);
+            }
+    
+            $notificationService = new NotificationService();
+            $admin = User::where('role', 'admin')->first();
+            $booking = null;
+            if (!$bookingType || !$userId) {
+                return response()->json(['status' => false, 'message' => 'Missing metadata from Stripe session.'], 400);
+            }
+
+            $booking = null;
+            $user = User::find($userId);
+            if (!$user) {
+                return response()->json(['status' => false, 'message' => 'User not found.'], 404);
+            }
+
+            $notificationService = new NotificationService();
+            $admin = User::where('role', 'admin')->first();
+
+            DB::transaction(function () use ($metadata, $bookingType, $user, &$booking, $notificationService, $admin, $session, $paymentIntentId) {
+                switch ($bookingType) {
+                    case 'haj':
+                        $hajBookingId = $metadata->haj_booking_id ?? null;
+                        $hajBooking = HajBooking::find($hajBookingId);
+                        if ($hajBooking) {
+                            $hajBooking->status = 'pending';
+                            $hajBooking->save();
+
+                            $haj = Haj::find($hajBooking->haj_id);
+                            if ($haj) {
+                                $booking = Booking::create([
+                                    'user_id' => $user->id,
+                                    'user_name' => $user->name,
+                                    'type' => 'haj',
+                                    'status' => 'pending',
+                                    'price' => $haj->total_price,
+                                    'stripe_payment_intent_id' => $paymentIntentId,
+                                ]);
+                            }
+                        }
+                        break;
+
+                    case 'visa':
+                        $visaBookingId = $metadata->visa_booking_id ?? null;
+                        $visaBooking = VisaBooking::find($visaBookingId);
+                        if ($visaBooking) {
+                            $visaBooking->status = 'pending';
+                            $visaBooking->save();
+
+                            $visaId = $metadata->visa_id ?? null;
+                            $visa = Visa::find($visaId);
+                            if ($visa) {
+                                $booking = Booking::create([
+                                    'user_id' => $user->id,
+                                    'user_name' => $user->name,
+                                    'type' => 'visa',
+                                    'status' => 'paid',
+                                    'price' => $visa->Total_cost,
+                                    'stripe_payment_intent_id' => $paymentIntentId,
+                                ]);
+
+                                $title = 'New Visa Request Paid';
+                                $message = "A visa request to {$visa->country} has been paid for by {$user->name}.";
+                                if ($admin) {
+                                    $notificationService->sendToUser($title, $message, $admin);
+                                }
+                            }
+                        }
+                        break;
+
+                    case 'ticket':
+                        $ticketRequestId = $metadata->ticket_request_id ?? null;
+                        $ticketRequest = TicketRequest::find($ticketRequestId);
+                        if ($ticketRequest) {
+                            $ticketRequest->status = 'pending';
+                            $ticketRequest->save();
+
+                            $flightId = $metadata->flight_id ?? null;
+                            $flight = Flight::find($flightId);
+                            if ($flight) {
+                                $booking = Booking::create([
+                                    'user_id' => $user->id,
+                                    'user_name' => $user->name,
+                                    'type' => 'ticket',
+                                    'status' => 'paid',
+                                    'price' => $flight->price,
+                                    'stripe_payment_intent_id' => $paymentIntentId,
+                                ]);
+
+                                $title = 'New Ticket Request Paid';
+                                $message = "A ticket request has been paid for by {$user->name}.";
+                                if ($admin) {
+                                    $notificationService->sendToUser($title, $message, $admin);
+                                }
+                            }
+                        }
+                        break;
+
+                    case 'passport':
+                        $passportRequestId = $metadata->passport_request_id ?? null;
+                        $passportRequest = PassportRequest::find($passportRequestId);
+                        if ($passportRequest) {
+                            $passportRequest->status = 'processing';
+                            $passportRequest->save();
+
+                            $booking = Booking::create([
+                                'user_id' => $user->id,
+                                'user_name' => $user->name,
+                                'type' => 'passport',
+                                'status' => 'paid',
+                                'price' => $passportRequest->price,
+                                'stripe_payment_intent_id' => $paymentIntentId,
+                            ]);
+
+                            event(new \App\Events\PassportRequested($passportRequest));
+                            $title = 'New Passport Request Paid';
+                            $message = "A passport request has been paid for by {$user->name}.";
+                            if ($admin) {
+                                $notificationService->sendToUser($title, $message, $admin);
+                            }
+                        }
+                        break;
+                }
+            });
+
+            if (!$booking) {
+                return response()->json(['status' => false, 'message' => 'Booking record could not be processed.'], 404);
+            }
+
+            return response()->json(['status' => true, 'message' => 'Payment successful and booking created.', 'booking' => $booking], 200);
+
+        } catch (\Exception $e) {
+            return response()->json(['status' => false, 'message' => 'Payment verification failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+
+    
+
+    
+    public function handlePaymentCancel()
+    {
         return response()->json([
-            'status' => true,
-            'message' => 'Haj booking request submitted successfully',
-            'booking' => $booking,
-            'haj_booking' => $hajBooking
-        ], 201);
+            'status' => false,
+            'message' => 'Payment was cancelled.'
+        ], 400);
     }
 
     public function logout(Request $request)
@@ -417,22 +641,42 @@ class UserController extends Controller {
     }
 
     public function cancelBooking(Request $request, $id)
-    {
-        $booking = Booking::find($id);
+{
+    $booking = Booking::find($id);
 
-        if (!$booking) {
-            return response()->json(['status' => false, 'message' => 'Booking not found'], 404);
-        }
-
-        if ($booking->user_id !== auth()->id()) {
-            return response()->json(['status' => false, 'message' => 'Unauthorized'], 403);
-        }
-
-        $booking->delete();
-
-        return response()->json(['status' => true, 'message' => 'Booking canceled successfully'], 200);
+    if (!$booking) {
+        return response()->json(['status' => false, 'message' => 'Booking not found'], 404);
     }
 
+    if ($booking->user_id !== auth()->id()) {
+        return response()->json(['status' => false, 'message' => 'Unauthorized'], 403);
+    }
+
+  
+    if ($booking->status === 'complete') {
+        return response()->json(['status' => false, 'message' => 'Cannot cancel a completed booking.'], 400);
+    }
+    
+    
+    if (is_null($booking->stripe_payment_intent_id)) {
+        return response()->json(['status' => false, 'message' => 'Payment ID not found, cannot process refund automatically.'], 500);
+    }
+
+    try {
+        Stripe::setApiKey(config('services.stripe.secret'));
+        
+        \Stripe\Refund::create([
+            'payment_intent' => $booking->stripe_payment_intent_id,
+        ]);
+        $booking->status = 'canceled';
+        $booking->save();
+        return response()->json(['status' => true, 'message' => 'Booking canceled and refund is being processed.'], 200);
+
+    } 
+    catch (\Exception $e) {
+        return response()->json(['status' => false, 'message' => 'Refund failed: ' . $e->getMessage()], 500);
+    }
+}
     public function getRequestsStatus(Request $request)
     {
         $userId = auth()->id();
