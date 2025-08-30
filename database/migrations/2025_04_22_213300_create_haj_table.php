@@ -15,6 +15,7 @@ return new class extends Migration
     {
         Schema::create('haj', function (Blueprint $table) {
             $table->id();
+            $table->string('category_of');
             $table->string('package_type');
             $table->decimal('total_price', 10, 2);
             $table->date('departure_date');

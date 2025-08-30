@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
             'phone'    => '+1234567890',
             'age'      => 30,
             'role'     => 'admin',
-            'fcm_token'=> 'test_admin_token_'.uniqid(),
+            'fcm_token'=> 'fc25DZcAvmbUmpQhNnffeW:APA91bFqmhGuksNlI75zHzdLej-5MiaRMioOKW72QtktbcRR1Vxvix2lDUPGxKLjZ93vq28AUAE20e-Ju-ScK6dq3M6SYjhyfLD_iyOM6O0imr45dXdvEV4',
         ]);
 
         // Create a few regular users with fake fcm_tokens

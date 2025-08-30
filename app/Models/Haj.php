@@ -10,6 +10,7 @@ class Haj extends Model
 {
     protected $table = 'haj';
     protected $fillable = [
+        'category_of',
         'package_type',
         'total_price',
         'departure_date',

@@ -12,9 +12,10 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->string('user_name');
-            $table->enum('type', ['visa', 'ticket', 'passport', 'haj']);
+            $table->enum('type', ['visa', 'ticket', 'passport', 'haj', 'hotel']);
             $table->string('status');
             $table->decimal('price', 10, 2);
+            $table->string('stripe_payment_intent_id')->nullable();
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
@@ -22,7 +23,12 @@ return new class extends Migration
     }
 
     public function down()
+    
     {
+        Schema::table('bookings', function (Blueprint $table) 
+        {
+        $table->dropColumn('stripe_payment_intent_id');
+        });
         Schema::dropIfExists('bookings');
     }
 };

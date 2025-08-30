@@ -13,6 +13,7 @@ use App\Models\RejectionReason;
 use App\Models\Notification;
 use App\Models\VisaBooking;
 use App\Models\PassportRequest;
+use App\Models\HotelRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -332,7 +333,110 @@ public function updateVisaBooking(Request $request)
         'visa_booking' => $visaBooking]);
 }
 
-public function handleHajBookingRequest(Request $request)
+public function handleHotelRequest(Request $request)
+{
+    if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        return response()->json([
+            'status' => false,
+            'message' => 'You are not authorized to perform this action'
+        ], 403);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'hotel_request_id' => 'required|exists:hotel_requests,id',
+        'status' => 'required|in:approved,rejected',
+        'rejection_reason' => 'required_if:status,rejected|string'
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Invalid data',
+            'errors' => $validator->errors()
+        ], 400);
+    }
+
+    $hotelRequest = HotelRequest::with('user')->find($request->hotel_request_id);
+    if (!$hotelRequest) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Hotel request not found'
+        ], 404);
+    }
+
+    if ($hotelRequest->status !== 'pending') {
+        return response()->json([
+            'status' => false,
+            'message' => 'This hotel request has already been processed'
+        ], 400);
+    }
+
+    $hotelRequest->status = $request->status;
+    $hotelRequest->save();
+
+    $booking = Booking::where('user_id', $hotelRequest->user_id)
+        ->where('type', 'hotel')
+        ->where('status', 'pending')
+        ->latest()
+        ->first();
+
+    if ($booking) {
+        $booking->status = $request->status;
+        $booking->save();
+    }
+
+    if ($request->status === 'rejected' && $request->rejection_reason) {
+        if ($booking && $booking->stripe_payment_intent_id) {
+            try {
+                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+                \Stripe\Refund::create([
+                    'payment_intent' => $booking->stripe_payment_intent_id,
+                ]);
+                $booking->status = 'refunded';
+                $booking->save();
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Hotel request rejected, but refund failed: ' . $e->getMessage()
+                ], 500);
+            }
+        }
+
+        // Note: Using 'general' for request_type until enum includes 'hotel'
+        $rejectionReason = new RejectionReason([
+            'reason' => $request->rejection_reason,
+            'request_type' => 'general',
+            'request_id' => $hotelRequest->id,
+            'user_id' => $hotelRequest->user_id
+        ]);
+        $rejectionReason->save();
+    }
+
+    $notificationService = new NotificationService();
+    $title = '';
+    $message = '';
+    $user = $hotelRequest->user;
+
+    if ($request->status === 'rejected') {
+        $title = 'Hotel Request Rejected';
+        $message = 'We’re sorry, your hotel request has been rejected. Reason: ' . $request->rejection_reason;
+    } elseif ($request->status === 'approved') {
+        $title = 'Hotel Request Approved';
+        $message = 'Your hotel request has been approved. Please review the details.';
+    }
+
+    if (!empty($title) && !empty($message) && $user) {
+        $notificationService->sendToUser($title, $message, $user);
+    }
+
+    return response()->json([
+        'status' => true,
+        'message' => 'Hotel request processed successfully',
+        'hotel_request' => $hotelRequest
+    ]);
+}
+
+public function getHajBookingRequest(Request $request)
 {
     if (!auth()->user() || !in_array(auth()->user()->role, ['admin', 'super_admin'])) {
         return response()->json([
@@ -479,6 +583,23 @@ public function getAllHajBookings()
         return response()->json([
             'status' => 'error',
             'message' => 'Error occurred while retrieving Hajj bookings'
+        ], 500);
+    }
+}
+
+public function getAllHotelRequests()
+{
+    try {
+        $hotelRequests = HotelRequest::get();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'All hotel requests retrieved successfully',
+            'data' => $hotelRequests
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error occurred while retrieving hotel requests'
         ], 500);
     }
 }
@@ -643,13 +764,17 @@ public function updateBookingStatus(Request $request, $id)
                     ], 500);
                 }
             }
+            // Ensure request_type conforms to rejection_reasons enum (no 'hotel' yet)
+            $allowedTypes = ['visa', 'passport', 'ticket', 'taxi', 'general', 'haj'];
+            $requestType = in_array($booking->type, $allowedTypes, true) ? $booking->type : 'general';
+
             $rejectionReason = new RejectionReason([
                 'reason' => $request->rejection_reason,
-                'request_type' => $booking->type,
+                'request_type' => $requestType,
                 'request_id' => $booking->id,
                 'user_id' => $booking->user_id
             ]);
-            $booking->rejectionReason()->save($rejectionReason);
+            $rejectionReason->save();
         }
         
         $booking->save();

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Services\NotificationService;
 use App\Models\User;
+use App\Models\Category;
 class HajController extends Controller
 {
      protected $notificationService;
@@ -25,6 +26,7 @@ class HajController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'category_id'=>'required',
             'package_type' => 'required|in:haj,umrah',
             'total_price' => 'required|numeric|min:0',
             'departure_date' => 'required|date|after:now',
@@ -40,8 +42,10 @@ class HajController extends Controller
                 'errors' => $validator->errors()
             ], 400);
         }
-
+         $cate=Category::where('id',$request->category_id)->first();
+        
         $hajTrip = Haj::create([
+            'category_of'=>$cate->name,
             'package_type' => $request->package_type,
             'total_price' => $request->total_price,
             'departure_date' => $request->departure_date,

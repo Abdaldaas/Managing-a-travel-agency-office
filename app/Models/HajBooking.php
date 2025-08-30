@@ -31,4 +31,8 @@ class HajBooking extends Model
     {
         return $this->belongsTo(Haj::class);
     }
+    public function category(): HasOne
+    {
+        return $this->hasOne(Category::class);
+    }
 }

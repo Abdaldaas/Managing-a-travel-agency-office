@@ -33,5 +33,9 @@ return [
     'airportdb' => [
         'key' => env('AIRPORTDB_API_KEY'),
     ],
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'key' => env('STRIPE_KEY'),
+    ],
 
 ];

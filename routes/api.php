@@ -10,6 +10,7 @@ use App\Http\Controllers\VisaController;
 use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\TaxiController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\HotelController;
 
 // Public Routes
 Route::get('/weather', [WeatherController::class, 'getWeather']);
@@ -18,11 +19,16 @@ Route::post('/login', [UserController::class, 'login']);
 Route::post('/driver/login', [AuthController::class, 'driverLogin']);
 Route::post('/admin/login', [AdminController::class, 'adminLogin']);
 
+Route::get('/payment/success', [UserController::class, 'handlePaymentSuccess'])->name('payment.success');
+Route::get('/payment/cancel', [UserController::class, 'handlePaymentCancel'])->name('payment.cancel');
+
 // Authenticated User Routes
 Route::middleware('auth:sanctum')->group(function () {
     // User Profile & Auth
     Route::post('/logout', [UserController::class, 'logout']);
+
     
+    Route::get('/tickets_shows', [UserController::class, 'get_tickets']);
     // User Requests
     Route::post('/visa/request', [UserController::class, 'requestVisa']);
     Route::post('/ticket/request', [UserController::class, 'requestTicket']);
@@ -32,8 +38,9 @@ Route::middleware('auth:sanctum')->group(function () {
     
     //
     Route::get('/haj', [HajController::class, 'getAllHajTrips']);
-    Route::get('/flight', action:  [FlightController::class, 'getAllFlights']);
+    Route::get('/flight', [FlightController::class, 'getAllFlights']);
     Route::get('/visa/showall', [VisaController::class, 'getAllVisas']);
+    Route::get('/hotels', [HotelController::class, 'getAllHotels']);
     // User Notifications
     Route::get('/notifications', [UserController::class, 'getNotifications']);
     Route::patch('/notifications/{id}/mark-as-read', [UserController::class, 'markNotificationAsRead']);
@@ -42,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Bookings
     Route::get('/bookings', [UserController::class, 'getBookings']);
     Route::delete('/bookings/{id}', [UserController::class, 'cancelBooking']);
+    Route::post('/hotel_request', [HotelController::class, 'requestHotel']);
     
     // User Taxi
     Route::post('/taxi/request', [TaxiController::class, 'requestTaxi']);
@@ -97,7 +105,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/flight', [FlightController::class, 'getAllFlights']);
     Route::get('/admin/flight/{id}', [FlightController::class, 'getFlightById']);
     Route::get('/airports', [FlightController::class, 'getAirports']);
-    
+        Route::get('/flight', action:  [FlightController::class, 'getAllFlights']);
     // Reports
     Route::get('/admin/reports/bookings', [AdminController::class, 'getBookingsReport']);
     Route::get('/admin/reports/revenue', [AdminController::class, 'getRevenueReport']);
@@ -106,6 +114,11 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/admin/notifications', [AdminController::class, 'getNotifications']);
     Route::patch('/admin/notifications/{id}/mark-as-read', [AdminController::class, 'markNotificationAsRead']);
     Route::delete('/admin/notifications/{id}', [AdminController::class, 'deleteNotification']);
+    // Hotel Management
+    Route::post('/admin/hotel', [HotelController::class, 'addHotel']);
+    Route::delete('/admin/hotel/{id}', [HotelController::class, 'deleteHotel']);
+    Route::post('/admin/hotel-request/handle', [AdminController::class, 'handleHotelRequest']);
+    Route::get('/admin/hotel-requests', [AdminController::class, 'getAllHotelRequests']);
 });
 
 // Driver Routes

@@ -16,7 +16,8 @@ class Booking extends Model
         'status',
         'price',
         'bookable_id',
-        'bookable_type'
+        'bookable_type',
+        'stripe_payment_intent_id'
     ];
 
     protected $casts = [

@@ -13,6 +13,7 @@ use App\Models\TicketRequest;
 use App\Models\Flight;
 use App\Models\Haj;
 use App\Models\HajBooking;
+use App\Models\HotelRequest;
 
 use App\Models\PassportRequest;
 use App\Models\User;
@@ -96,6 +97,23 @@ class UserController extends Controller {
         return response()->json(['status' => true,'message' => 'Login successful',
         'user' => $user,'token' => $token], 200);
     }
+
+    public function get_tickets(Request $request)
+{
+    $userId = auth()->id();
+
+    $tickets = TicketRequest::where('user_id', $userId)->get();
+    $flightIds = $tickets->pluck('flight_id')->unique();
+    $flights = Flight::whereIn('id', $flightIds)->get();
+
+    return response()->json([
+        'status' => true,
+        'tickets' => $tickets,
+        'flights' => $flights
+    ], 200);
+}
+
+
     public function requestPassport(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -190,7 +208,7 @@ class UserController extends Controller {
             $passportRequest->status = 'pending_payment';
             $passportRequest->calculatePrice();
             $passportRequest->save();
- 
+            try{
             Stripe::setApiKey(config('services.stripe.secret'));
 
             $checkout_session = \Stripe\Checkout\Session::create([
@@ -223,10 +241,20 @@ class UserController extends Controller {
             ], 200);
     
         } catch (\Exception $e) {
-            return response()->json(['status' => false, 'message' => 'Error processing passport request: ' . $e->getMessage()], 500);
+            return response()->json([
+                'status' => false,
+                'message' => 'Payment processing failed: ' . $e->getMessage()
+            ], 500);
         }
+    
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Error processing passport request: ' . $e->getMessage()
+        ], 500);
     }
-
+    
+    }
     public function requestVisa(Request $request)
 {
     $validator = Validator::make($request->all(), [
@@ -594,9 +622,34 @@ public function requestTicket(Request $request)
                                 'stripe_payment_intent_id' => $paymentIntentId,
                             ]);
 
-                            event(new \App\Events\PassportRequested($passportRequest));
+                       
                             $title = 'New Passport Request Paid';
                             $message = "A passport request has been paid for by {$user->name}.";
+                            if ($admin) {
+                                $notificationService->sendToUser($title, $message, $admin);
+                            }
+                        }
+                        break;
+
+                    case 'hotel':
+                        $hotelRequestId = $metadata->hotel_request_id ?? null;
+                        $hotelRequest = HotelRequest::find($hotelRequestId);
+                        if ($hotelRequest) {
+                            // After payment, mark request as pending for admin processing
+                            $hotelRequest->status = 'pending';
+                            $hotelRequest->save();
+
+                            $booking = Booking::create([
+                                'user_id' => $user->id,
+                                'user_name' => $user->name,
+                                'type' => 'hotel',
+                                'status' => 'pending',
+                                'price' => $hotelRequest->price,
+                                'stripe_payment_intent_id' => $paymentIntentId,
+                            ]);
+
+                            $title = 'New Hotel Request Paid';
+                            $message = "A hotel booking request has been paid for by {$user->name}.";
                             if ($admin) {
                                 $notificationService->sendToUser($title, $message, $admin);
                             }
@@ -685,6 +738,7 @@ public function requestTicket(Request $request)
         $visaBookings = VisaBooking::where('user_id', $userId)->get();
         $ticketRequests = TicketRequest::where('user_id', $userId)->get();
         $hajBookings = HajBooking::where('user_id', $userId)->get();
+        $hotelRequests = HotelRequest::where('user_id', $userId)->get();
 
         return response()->json([
             'status' => true,
@@ -693,6 +747,7 @@ public function requestTicket(Request $request)
                 'visa_bookings' => $visaBookings,
                 'ticket_requests' => $ticketRequests,
                 'haj_bookings' => $hajBookings,
+                'hotel_requests' => $hotelRequests,
             ]
         ], 200);
     }
